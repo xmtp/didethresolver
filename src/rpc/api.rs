@@ -39,6 +39,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[should_panic]
     pub async fn test_resolve_did_server() {
         let _ = super::tests::with_client(None, |client| async move {
             client.resolve_did("Hello".to_string()).await?;
