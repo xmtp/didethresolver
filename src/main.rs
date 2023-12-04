@@ -2,9 +2,6 @@ mod rpc;
 mod types;
 mod util;
 
-use anyhow::Error;
-use jsonrpsee::{rpc_params, server::Server, RpcModule};
-
 fn main() {
     util::init_logging();
     println!("Hello, world!");
