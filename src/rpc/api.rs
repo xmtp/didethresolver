@@ -14,12 +14,12 @@ pub trait DidRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use async_trait::async_trait;
     use mockall::{mock, predicate::*};
 
     use crate::rpc::tests::with_client;
-        
+
     mock! {
         pub DidRegistryMethods {}
 
@@ -28,11 +28,11 @@ mod tests {
             async fn resolve_did(&self, _public_key: String) -> Result<DidDocument, ErrorObjectOwned>;
         }
     }
-    
+
     #[tokio::test]
     pub async fn test_resolve_did() {
         crate::util::init_logging();
-        
+
         let mut mock = MockDidRegistryMethods::new();
         mock.expect_resolve_did().returning(|_| Ok(DidDocument));
         // test stub
@@ -43,6 +43,7 @@ mod tests {
         let _ = super::tests::with_client(None, |client| async move {
             client.resolve_did("Hello".to_string()).await?;
             Ok::<_, anyhow::Error>(())
-        }).await;
+        })
+        .await;
     }
 }
