@@ -1,4 +1,5 @@
-//! Trait Implementations for DID JSON-RPC
+//! Interface Implementations for DID Registry JSON-RPC
+
 use super::api::*;
 use crate::types::DidDocument;
 

@@ -1,4 +1,4 @@
-//! Trait Definitions for JSON-RPC
+//! Trait Interface Definitions for DID Registry JSON-RPC
 
 use crate::types::DidDocument;
 

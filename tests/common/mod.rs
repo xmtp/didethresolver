@@ -1,16 +1,10 @@
-//! Internal Utility functions for use in crate
-
-#[cfg(test)]
+//! Shared setup code for integration tests
 use std::sync::Once;
-#[cfg(test)]
 use tracing_forest::ForestLayer;
-#[cfg(test)]
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
-#[cfg(test)]
 static INIT: Once = Once::new();
 
-#[cfg(test)]
 pub(crate) fn init_logging() {
     INIT.call_once(|| {
         Registry::default()

@@ -17,7 +17,14 @@ mod tests {
 
     use super::*;
 
-    // Test harness for using a WebSockets Server
+    /// Test harness for using a WebSockets Server
+    /// Optionally provide a timeout [`std::time::Duration`] deadline by which the test must
+    /// finish.
+    ///
+    /// # Panics
+    ///
+    /// If `fun` panics, the test will end upon reaching `timeout`. Default timeout is 50
+    /// milliseconds.
     pub async fn with_client<F, R, T>(timeout: Option<Duration>, fun: F) -> T
     where
         F: FnOnce(WsClient) -> R + 'static,
