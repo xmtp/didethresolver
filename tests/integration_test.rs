@@ -1,4 +1,4 @@
-mod common;
+mod integration_util;
 
 // use didethresolver::rpc::DidRegistryServer;
 
