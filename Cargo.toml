@@ -2,7 +2,25 @@
 name = "didethresolver"
 version = "0.1.0"
 edition = "2021"
+resolver = "2"
 
+[profile.release]
+panic = 'abort'
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+log = "0.4"
+tokio = { version = "1.34", features = ["macros", "rt"] }
+async-trait = "0.1"
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+jsonrpsee = { version = "0.20", features = ["macros", "server", "client-core"] }
+anyhow = "1"
+
+[dev-dependencies]
+mockall = "0.11"
+jsonrpsee = { version = "0.20", features = ["macros", "server", "client"] }
+futures = "0.3"
+tokio = { version = "1.34", features = ["macros", "rt", "time"] }
+tracing-forest = { version = "0.1", features = ["ansi", "chrono", "env-filter"] }
+tracing-subscriber = "0.3.18"
