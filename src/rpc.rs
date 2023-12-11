@@ -3,6 +3,7 @@ mod methods;
 
 // re-export the defined API
 pub use api::*;
+pub use methods::*;
 
 #[cfg(test)]
 mod tests {
@@ -14,6 +15,7 @@ mod tests {
         ws_client::{WsClient, WsClientBuilder},
     };
     use tokio::time::timeout as timeout_tokio;
+    use url::Url;
 
     use super::*;
 
@@ -30,8 +32,6 @@ mod tests {
         F: FnOnce(WsClient) -> R + 'static,
         R: Future<Output = T> + FutureExt + Send + 'static,
     {
-        crate::util::init_logging();
-
         let server = Server::builder().build("127.0.0.1:0").await.unwrap();
         let addr = server.local_addr().unwrap();
         let handle = server.start(methods::DidRegistryMethods.into_rpc());

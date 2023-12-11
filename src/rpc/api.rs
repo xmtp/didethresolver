@@ -31,10 +31,8 @@ mod tests {
 
     #[tokio::test]
     pub async fn test_resolve_did() {
-        crate::util::init_logging();
-
         let mut mock = MockDidRegistryMethods::new();
-        mock.expect_resolve_did().returning(|_| Ok(DidDocument));
+        // mock.expect_resolve_did().returning(|_| Ok(DidDocument::default()));
         // test stub
     }
 
