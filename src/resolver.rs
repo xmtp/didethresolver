@@ -45,5 +45,7 @@ impl Resolver {
 
     pub fn resolve_did(&self, public_key: String) -> DidDocument {
         todo!();
+        // validate eth address or transaction hash
+        //
     }
 }

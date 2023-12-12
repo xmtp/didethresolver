@@ -1,6 +1,7 @@
 //! Convenience Wrapper around [`Url`] for DID URIs according to the [DID Spec](https://www.w3.org/TR/did-core/#did-syntax)
 
 use serde::{Deserialize, Serialize};
+use smart_default::SmartDefault;
 use thiserror::Error;
 use url::Url;
 
@@ -10,7 +11,7 @@ pub struct DidUrl {
     #[serde(skip)]
     method_end: usize,
     #[serde(skip)]
-    id_end: usize,
+    id: Id,
 }
 
 impl DidUrl {
@@ -40,11 +41,11 @@ impl DidUrl {
         let url = Url::parse(input)?;
 
         let (method_end, id_end) = Self::extract_method_and_id(&url);
-
+        let id: Id = url.path()[method_end + 1..id_end].try_into()?;
         Ok(Self {
             url,
             method_end,
-            id_end,
+            id,
         })
     }
 
@@ -59,7 +60,7 @@ impl DidUrl {
     /// Retrieves the method name from the DID URL, as defined in the [W3C DID specification](https://www.w3.org/TR/did-core/#did-url-syntax).
     ///
     /// Extracts the method name part of the DID URI, which indicates the specific DID method used.
-    /// The method name is indicates the underlying consensus system (e.g. ethereum) the DID is associated with.
+    /// The method name indicates the underlying consensus system (e.g. ethereum) the DID is associated with.
     ///
     /// # Returns
     /// A string slice (`&str`) with the DID method name.
@@ -89,16 +90,145 @@ impl DidUrl {
     /// assert_eq!(did_url.id(), "123");
     /// ```
     ///
-    pub fn id(&self) -> &str {
-        let path: &str = self.url.path();
-        &path[self.method_end + 1..self.id_end]
+    pub fn id(&self) -> &Id {
+        &self.id
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum NetworkId {
+    Ethereum,
+    Sepolia,
+    Goerli,
+}
+
+impl<'a> TryFrom<&'a str> for NetworkId {
+    type Error = ParseError;
+    fn try_from(network_id: &'a str) -> Result<NetworkId, ParseError> {
+        match network_id {
+            "0x1" => Ok(NetworkId::Ethereum),
+            "0xaa36a7" => Ok(NetworkId::Sepolia),
+            "0x5" => Ok(NetworkId::Goerli),
+            _ => Err(ParseError::UnknownNetwork(network_id.into())),
+        }
+    }
+}
+
+impl From<NetworkId> for String {
+    fn from(id: NetworkId) -> String {
+        match id {
+            NetworkId::Ethereum => "0x1".into(),
+            NetworkId::Sepolia => "0xaa36a7".into(),
+            NetworkId::Goerli => "0x5".into(),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a str> for AddressOrTransactionHash {
+    type Error = ParseError;
+
+    fn try_from(address_or_hash: &'a str) -> Result<AddressOrTransactionHash, Self::Error> {
+        if is_valid_evm_address(address_or_hash) {
+            return Ok(AddressOrTransactionHash::Address(address_or_hash.into()));
+        } else if is_valid_tx_hash(address_or_hash) {
+            return Ok(AddressOrTransactionHash::TransactionHash(
+                address_or_hash.into(),
+            ));
+        }
+
+        Err(ParseError::UnknownId(address_or_hash.into()))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct Id {
+    pub network_id: Option<NetworkId>,
+    pub address_or_hash: AddressOrTransactionHash,
+}
+
+impl Id {
+    pub fn new(network_id: Option<NetworkId>, address_or_hash: AddressOrTransactionHash) -> Self {
+        Self {
+            network_id,
+            address_or_hash,
+        }
+    }
+}
+
+/// Represents Either an Address or TransactionHash
+#[derive(Clone, Debug, PartialEq, Eq, SmartDefault)]
+pub enum AddressOrTransactionHash {
+    #[default]
+    Address(String),
+    TransactionHash(String),
+}
+
+impl<'a> TryFrom<&'a str> for Id {
+    type Error = ParseError;
+
+    fn try_from(id: &'a str) -> Result<Id, Self::Error> {
+        let separator_indices: Vec<usize> = id
+            .char_indices()
+            .filter(|(_, c)| *c == ':')
+            .map(|(idx, _)| idx)
+            .collect();
+        if separator_indices.len() > 2 {
+            return Err(ParseError::UnsupportedId(id.to_string()));
+        }
+
+        // the network ID is included in the DID
+        if separator_indices.len() == 1 {
+            let network_id: NetworkId = id[0..separator_indices[0]].try_into()?;
+            let address_or_hash = id[(separator_indices[0] + 1)..].try_into()?;
+
+            Ok(Id {
+                network_id: Some(network_id),
+                address_or_hash,
+            })
+        } else {
+            let address_or_hash = id.try_into()?;
+            Ok(Id {
+                network_id: None,
+                address_or_hash,
+            })
+        }
+    }
+}
+
+/// Check if an string is a valid ethereum address (valid hex and length 40 (20 bytes)).
+pub fn is_valid_evm_address<S: AsRef<str>>(address: S) -> bool {
+    let address = address.as_ref();
+    let address = address.strip_prefix("0x").unwrap_or(address);
+
+    if address.len() != 40 {
+        return false;
+    }
+
+    address.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Check if an string is a valid transaction hash (valid hex and length 66 (33 bytes)).
+pub fn is_valid_tx_hash<S: AsRef<str>>(address: S) -> bool {
+    let address = address.as_ref();
+    let address = address.strip_prefix("0x").unwrap_or(address);
+
+    if address.len() != 66 {
+        return false;
+    }
+
+    address.chars().all(|c| c.is_ascii_hexdigit())
 }
 
 #[derive(Debug, Error)]
 pub enum ParseError {
     #[error(transparent)]
     Url(#[from] url::ParseError),
+    #[error("The DID contains unsupported ID Elements {0}")]
+    UnsupportedId(String),
+    #[error("The network {0} is not supported")]
+    UnknownNetwork(String),
+    #[error("The Id {0} is not an address or transaction hash")]
+    UnknownId(String),
 }
 
 #[cfg(test)]
@@ -191,7 +321,6 @@ mod tests {
             "did:example:123?versionTime=2021-05-10T17:00:00Z",
             "did:example:123?service=files&relativeRef=/resume.pdf",
         ];
-
         assert_eq!(
             DidUrl::parse("did:example:123456/path").unwrap().id(),
             "123456"
@@ -223,7 +352,20 @@ mod tests {
             DidUrl::parse("did:example:123?service=files&relativeRef=/resume.pdf")
                 .unwrap()
                 .id(),
-            "123"
+        );
+        let parsed =
+            DidUrl::parse("did:ethr:0x5:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74").unwrap();
+
+        assert_eq!(
+            DidUrl::parse("did:ethr:0x5:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74")
+                .unwrap()
+                .id(),
+            &Id {
+                network_id: Some(NetworkId::Goerli),
+                address_or_hash: AddressOrTransactionHash::Address(
+                    "0xf3beac30c498d9e26865f34fcaa57dbb935b0d74".into()
+                )
+            },
         );
     }
 }
