@@ -95,11 +95,14 @@ impl DidUrl {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+/// The supported networks for this DID
+#[derive(Copy, Clone, Debug, PartialEq, Eq, SmartDefault)]
 pub enum NetworkId {
+    /// The Ethereum Main Net
+    #[default]
     Ethereum,
+    /// The Sepolia Ethereum Test Network
     Sepolia,
-    Goerli,
 }
 
 impl<'a> TryFrom<&'a str> for NetworkId {
@@ -108,7 +111,6 @@ impl<'a> TryFrom<&'a str> for NetworkId {
         match network_id {
             "0x1" => Ok(NetworkId::Ethereum),
             "0xaa36a7" => Ok(NetworkId::Sepolia),
-            "0x5" => Ok(NetworkId::Goerli),
             _ => Err(ParseError::UnknownNetwork(network_id.into())),
         }
     }
@@ -119,7 +121,6 @@ impl From<NetworkId> for String {
         match id {
             NetworkId::Ethereum => "0x1".into(),
             NetworkId::Sepolia => "0xaa36a7".into(),
-            NetworkId::Goerli => "0x5".into(),
         }
     }
 }
@@ -136,20 +137,23 @@ impl<'a> TryFrom<&'a str> for AddressOrTransactionHash {
             ));
         }
 
-        Err(ParseError::UnknownId(address_or_hash.into()))
+        Err(ParseError::UnknownConsensusId(address_or_hash.into()))
     }
 }
 
+/// The ID part of the DID. The ID contains an optional [`NetworkId`] and one of
+/// [`AddressOrTransactionHash`]. If the network is missing from the DID URL, we default to
+/// Mainnet, or [`NetworkId::Ethereum`]
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Id {
-    pub network_id: Option<NetworkId>,
+    pub network_id: NetworkId,
     pub address_or_hash: AddressOrTransactionHash,
 }
 
 impl Id {
     pub fn new(network_id: Option<NetworkId>, address_or_hash: AddressOrTransactionHash) -> Self {
         Self {
-            network_id,
+            network_id: network_id.unwrap_or(Default::default()),
             address_or_hash,
         }
     }
@@ -173,7 +177,7 @@ impl<'a> TryFrom<&'a str> for Id {
             .map(|(idx, _)| idx)
             .collect();
         if separator_indices.len() > 2 {
-            return Err(ParseError::UnsupportedId(id.to_string()));
+            return Err(ParseError::UnsupportedMethodId(id.to_string()));
         }
 
         // the network ID is included in the DID
@@ -182,13 +186,13 @@ impl<'a> TryFrom<&'a str> for Id {
             let address_or_hash = id[(separator_indices[0] + 1)..].try_into()?;
 
             Ok(Id {
-                network_id: Some(network_id),
+                network_id,
                 address_or_hash,
             })
         } else {
             let address_or_hash = id.try_into()?;
             Ok(Id {
-                network_id: None,
+                network_id: NetworkId::Ethereum,
                 address_or_hash,
             })
         }
@@ -212,98 +216,143 @@ pub fn is_valid_tx_hash<S: AsRef<str>>(address: S) -> bool {
     let address = address.as_ref();
     let address = address.strip_prefix("0x").unwrap_or(address);
 
-    if address.len() != 66 {
+    if address.len() != 64 {
         return false;
     }
 
     address.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum ParseError {
     #[error(transparent)]
     Url(#[from] url::ParseError),
     #[error("The DID contains unsupported ID Elements {0}")]
-    UnsupportedId(String),
+    UnsupportedMethodId(String),
     #[error("The network {0} is not supported")]
     UnknownNetwork(String),
     #[error("The Id {0} is not an address or transaction hash")]
-    UnknownId(String),
+    UnknownConsensusId(String),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use url::Url;
-
     #[test]
     fn test_parse_did() {
-        let did = "did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad?service=agent&relativeRef=/credentials#degree";
-        let url = DidUrl::parse(did);
-
         let examples = vec![
-            "did:example:123456/path",
-            "did:example:123456?versionId=1",
-            "did:example:123#public-key-0",
-            "did:example:123#agent",
-            "did:example:123?service=agent&relativeRef=/credentials#degree",
-            "did:example:123?versionTime=2021-05-10T17:00:00Z",
-            "did:example:123?service=files&relativeRef=/resume.pdf",
-            "did:example:123/file-test_23.png?service=files&relativeRef=/resume.pdf",
+            "did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74/path",
+            "did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74?versionId=1",
+            "did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74#public-key-0",
+            "did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74#agent",
+            "did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74?service=agent&relativeRef=/credentials#degree",
+            "did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74?versionTime=2021-05-10T17:00:00Z",
+            "did:example:0x9744fb1c8b01358ddb9310e7f0accac0843ac8800a1490cf446f56ef34dc0909?service=files&relativeRef=/resume.pdf",
+            "did:example:0x9744fb1c8b01358ddb9310e7f0accac0843ac8800a1490cf446f56ef34dc0909/file-test_23.png?service=files&relativeRef=/resume.pdf",
+            "did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad?service=agent&relativeRef=/credentials#degree",
         ];
 
         for did_url in examples {
-            let url = DidUrl::parse(did_url);
+            DidUrl::parse(did_url).unwrap();
         }
     }
 
     #[test]
-    fn test_method() {
-        let examples = vec![
-            "did:example:123456/path",
-            "did:example:123456?versionId=1",
-            "did:example:123#public-key-0",
-            "did:example:123#agent",
-            "did:example:123?service=agent&relativeRef=/credentials#degree",
-            "did:example:123?versionTime=2021-05-10T17:00:00Z",
-            "did:example:123?service=files&relativeRef=/resume.pdf",
-        ];
+    fn test_invalid_did_throws_error() {
+        let did = "did:ethr:123";
+        assert_eq!(
+            DidUrl::parse(did),
+            Err(ParseError::UnknownConsensusId("123".into()))
+        );
+        let did = "did:ethr:0x123456:2342345";
+        assert_eq!(
+            DidUrl::parse(did),
+            Err(ParseError::UnknownNetwork("0x123456".into()))
+        );
+        let did = "did:ethr:123:123:123:123";
+        assert_eq!(
+            DidUrl::parse(did),
+            Err(ParseError::UnsupportedMethodId("123:123:123:123".into()))
+        );
+    }
 
+    #[test]
+    fn test_networks() {
+        let sepolia = "did:ethr:0xaa36a7:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74";
         assert_eq!(
-            DidUrl::parse("did:example:123456/path").unwrap().method(),
-            "example"
+            DidUrl::parse(sepolia).unwrap().id(),
+            &Id::new(
+                Some(NetworkId::Sepolia),
+                "0xf3beac30c498d9e26865f34fcaa57dbb935b0d74"
+                    .try_into()
+                    .unwrap()
+            )
         );
+
+        let ethereum = "did:ethr:0x1:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74";
         assert_eq!(
-            DidUrl::parse("did:example:123456?versionId=1")
+            DidUrl::parse(ethereum).unwrap().id(),
+            &Id::new(
+                Some(NetworkId::Ethereum),
+                "0xf3beac30c498d9e26865f34fcaa57dbb935b0d74"
+                    .try_into()
+                    .unwrap()
+            )
+        );
+
+        let ethereum = "did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74";
+        assert_eq!(
+            DidUrl::parse(ethereum).unwrap().id(),
+            &Id::new(
+                Some(NetworkId::Ethereum),
+                "0xf3beac30c498d9e26865f34fcaa57dbb935b0d74"
+                    .try_into()
+                    .unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn test_method() {
+        assert_eq!(
+            DidUrl::parse("did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74/path")
                 .unwrap()
                 .method(),
             "example"
         );
         assert_eq!(
-            DidUrl::parse("did:example:123#public-key-0")
+            DidUrl::parse("did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74?versionId=1")
                 .unwrap()
                 .method(),
             "example"
         );
         assert_eq!(
-            DidUrl::parse("did:example:123#agent").unwrap().method(),
-            "example"
-        );
-        assert_eq!(
-            DidUrl::parse("did:example:123?service=agent&relativeRef=/credentials#degree")
+            DidUrl::parse("did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74#public-key-0")
                 .unwrap()
                 .method(),
             "example"
         );
         assert_eq!(
-            DidUrl::parse("did:example:123?versionTime=2021-05-10T17:00:00Z")
+            DidUrl::parse("did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74#agent")
                 .unwrap()
                 .method(),
             "example"
         );
         assert_eq!(
-            DidUrl::parse("did:example:123?service=files&relativeRef=/resume.pdf")
+            DidUrl::parse("did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74?service=agent&relativeRef=/credentials#degree")
+                .unwrap()
+                .method(),
+            "example"
+        );
+        assert_eq!(
+            DidUrl::parse("did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74?versionTime=2021-05-10T17:00:00Z")
+                .unwrap()
+                .method(),
+            "example"
+        );
+        assert_eq!(
+            DidUrl::parse("did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74?service=files&relativeRef=/resume.pdf")
                 .unwrap()
                 .method(),
             "example"
@@ -312,56 +361,19 @@ mod tests {
 
     #[test]
     fn test_id() {
-        let examples = vec![
-            "did:example:123456/path",
-            "did:example:123456?versionId=1",
-            "did:example:123#public-key-0",
-            "did:example:123#agent",
-            "did:example:123?service=agent&relativeRef=/credentials#degree",
-            "did:example:123?versionTime=2021-05-10T17:00:00Z",
-            "did:example:123?service=files&relativeRef=/resume.pdf",
-        ];
         assert_eq!(
-            DidUrl::parse("did:example:123456/path").unwrap().id(),
-            "123456"
-        );
-        assert_eq!(
-            DidUrl::parse("did:example:123456?versionId=1")
+            DidUrl::parse("did:example:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74?service=files&relativeRef=/resume.pdf")
                 .unwrap()
                 .id(),
-            "123456"
+            &Id::new(None, "0xf3beac30c498d9e26865f34fcaa57dbb935b0d74".try_into().unwrap())
         );
-        assert_eq!(
-            DidUrl::parse("did:example:123#public-key-0").unwrap().id(),
-            "123"
-        );
-        assert_eq!(DidUrl::parse("did:example:123#agent").unwrap().id(), "123");
-        assert_eq!(
-            DidUrl::parse("did:example:123?service=agent&relativeRef=/credentials#degree")
-                .unwrap()
-                .id(),
-            "123"
-        );
-        assert_eq!(
-            DidUrl::parse("did:example:123?versionTime=2021-05-10T17:00:00Z")
-                .unwrap()
-                .id(),
-            "123"
-        );
-        assert_eq!(
-            DidUrl::parse("did:example:123?service=files&relativeRef=/resume.pdf")
-                .unwrap()
-                .id(),
-        );
-        let parsed =
-            DidUrl::parse("did:ethr:0x5:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74").unwrap();
 
         assert_eq!(
-            DidUrl::parse("did:ethr:0x5:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74")
+            DidUrl::parse("did:ethr:0x1:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74")
                 .unwrap()
                 .id(),
             &Id {
-                network_id: Some(NetworkId::Goerli),
+                network_id: NetworkId::Ethereum,
                 address_or_hash: AddressOrTransactionHash::Address(
                     "0xf3beac30c498d9e26865f34fcaa57dbb935b0d74".into()
                 )
