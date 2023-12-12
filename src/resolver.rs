@@ -83,7 +83,6 @@ impl Resolver {
                 .events()
                 .from_block(previous_change)
                 .to_block(previous_change)
-                .address(self.registry.address().into())
                 .topic1(H256::from(public_key))
                 .query()
                 .await?;
