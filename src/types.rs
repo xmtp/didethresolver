@@ -11,14 +11,14 @@ pub use did_url::*;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DidDocument {
     #[serde(rename = "@context")]
-    context: Vec<Url>,
-    id: DidUrl,
+    pub context: Vec<Url>,
+    pub id: DidUrl,
     #[serde(rename = "alsoKnownAs")]
-    also_known_as: Option<Vec<DidUrl>>,
-    controller: Option<DidUrl>,
+    pub also_known_as: Option<Vec<DidUrl>>,
+    pub controller: Option<DidUrl>,
     #[serde(rename = "verificationMethod")]
-    verification_method: Option<Vec<VerificationMethod>>,
-    service: Option<Vec<Service>>,
+    pub verification_method: Option<Vec<VerificationMethod>>,
+    pub service: Option<Vec<Service>>,
 }
 
 /// TODO
@@ -52,7 +52,6 @@ pub struct VerificationMethod {
     blockchain_account_id: Option<String>,
     #[serde(rename = "ethereumAddress")]
     ethereum_address: Option<String>,
-
     // does not cover conditional proof2022 subtypes
 }
 
@@ -65,6 +64,5 @@ pub enum ServiceType {
 /// TODO
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum VerificationType {
-    Ed25519VerificationKey2020
+    Ed25519VerificationKey2020,
 }
-

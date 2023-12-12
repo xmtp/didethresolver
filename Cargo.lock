@@ -662,6 +662,7 @@ dependencies = [
  "mockall",
  "rand",
  "serde",
+ "sha3",
  "smart-default",
  "thiserror",
  "tokio",

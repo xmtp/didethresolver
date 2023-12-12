@@ -25,6 +25,7 @@ ethers = { version = "2", features = ["ws", "abigen"]}
 rand = "0.8"
 hex = "0.4"
 smart-default = "0.7"
+sha3 = "0.10"
 
 [dev-dependencies]
 mockall = "0.12"

@@ -1,21 +1,32 @@
 //! Interface Implementations for DID Registry JSON-RPC
 
-use super::api::*;
-use crate::types::DidDocument;
-
-use jsonrpsee::types::ErrorObjectOwned;
+use std::str::FromStr;
 
 use async_trait::async_trait;
+use ethers::types::H160;
+use jsonrpsee::types::ErrorObjectOwned;
 
-const LOG_TARGET: &str = "rpc";
+use super::api::*;
+use crate::{resolver::Resolver, types::DidDocument, types::DidUrl};
 
-pub struct DidRegistryMethods;
+pub struct DidRegistryMethods {
+    resolver: Resolver,
+}
+
+impl DidRegistryMethods {
+    pub fn new(resolver: Resolver) -> Self {
+        Self { resolver }
+    }
+}
 
 #[async_trait]
 impl DidRegistryServer for DidRegistryMethods {
-    async fn resolve_did(&self, _public_key: String) -> Result<DidDocument, ErrorObjectOwned> {
-        //TODO: Stub for resolveDid, ref: [#4](https://github.com/xmtp/didethresolver/issues/4)
-        log::debug!(target: LOG_TARGET, "resolve_did called");
-        todo!();
+    async fn resolve_did(&self, public_key: String) -> Result<DidDocument, ErrorObjectOwned> {
+        log::debug!("resolve_did called");
+        Ok(self
+            .resolver
+            .resolve_did(H160::from_str(&public_key).unwrap())
+            .await
+            .unwrap())
     }
 }
