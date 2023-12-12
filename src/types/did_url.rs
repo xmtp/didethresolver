@@ -17,7 +17,7 @@ pub struct DidUrl {
 impl DidUrl {
     /// Parses a Decentralized Identifier (DID) URI string.
     ///
-    /// This method takes a string slice (`input`) representing a DID URI and attempts to parse it
+    /// Takes a string slice (`input`) representing a DID URI and attempts to parse it
     /// into a `DidUrl` object.
     ///
     /// # Arguments
@@ -34,7 +34,7 @@ impl DidUrl {
     /// ```
     ///
     /// # Errors
-    /// This method returns a `ParseError` if the parsing of the URI fails or if the extracted
+    /// returns a `ParseError` if the parsing of the URI fails or if the extracted
     /// components (method name, method-specific ID) do not conform to the expected DID structure.
     ///
     pub fn parse<S: AsRef<str>>(input: S) -> Result<Self, ParseError> {
@@ -60,7 +60,7 @@ impl DidUrl {
     /// Retrieves the method name from the DID URL, as defined in the [W3C DID specification](https://www.w3.org/TR/did-core/#did-url-syntax).
     ///
     /// Extracts the method name part of the DID URI, which indicates the specific DID method used.
-    /// The method name is indicates the underlying consensus system (e.g. ethereum) the DID is associated with.
+    /// The method name indicates the underlying consensus system (e.g. ethereum) the DID is associated with.
     ///
     /// # Returns
     /// A string slice (`&str`) with the DID method name.
@@ -78,16 +78,23 @@ impl DidUrl {
 
     /// Retrieves the method-specific ID from the DID URL, as defined in the [W3C DID specification](https://www.w3.org/TR/did-core/#did-url-syntax).
     ///
-    /// This method extracts the method-specific ID from the DID URI. This ID is unique within the scope
+    /// Extracts the method-specific ID from the DID URI. This ID is unique within the scope
     /// of the DID method, ensuring the global uniqueness of the DID.
     ///
     /// # Returns
-    /// A string slice (`&str`) containing the method-specific ID of the DID URI.
+    /// A string slice (`&str`) containing the method-specific ID of the DID URI. This ID may
+    /// contain a chain id as well.
     ///
     /// # Examples
     /// ```
     /// let did_url = DidUrl::parse("did:example:123").unwrap();
     /// assert_eq!(did_url.id(), "123");
+    /// ```
+    ///
+    /// ```
+    /// // extra chain id (0x1 is Ethereum)
+    /// let did_url = DidUrl::parse("did:example:0x1:0x123").unwrap();
+    /// assert_eq!(did_url.id(), "0x1:123");
     /// ```
     ///
     pub fn id(&self) -> &str {
