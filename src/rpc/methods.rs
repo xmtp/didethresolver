@@ -23,6 +23,7 @@ impl DidRegistryMethods {
 impl DidRegistryServer for DidRegistryMethods {
     async fn resolve_did(&self, public_key: String) -> Result<DidDocument, ErrorObjectOwned> {
         log::debug!("resolve_did called");
+        // placeholder
         Ok(self
             .resolver
             .resolve_did(H160::from_str(&public_key).unwrap())
