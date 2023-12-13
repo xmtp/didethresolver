@@ -107,6 +107,44 @@ impl DidUrl {
     pub fn id_segments(&self) -> Split<'_, char> {
         self.id().split(':')
     }
+
+    /// Returns this DID's fragment identifier, if any.
+    ///  A fragment is the part of the URL after the # symbol. The fragment is optional and, if present, contains a fragment identifier that identifies a secondary resource, such as a section heading of a document.
+    ///
+    /// In a DID, a fragment may be used to reference a specific section or component within a DID document, such as
+    /// a particular verification method or service endpoint.
+    ///
+    ///  # Examples
+    /// ```
+    /// let did_url = DidUrl::parse("did:example:123456789abcdefghi#keys-1").unwrap();
+    /// assert_eq!(did_url.fragment(), Some("keys-1"));
+    /// ```
+    ///
+    /// **Note**: the parser did not percent-encode this component, but the input may have been percent-encoded already.
+
+    pub fn fragment(&self) -> Option<&str> {
+        self.url.fragment()
+    }
+
+    /// Change this DID's fragment identifier
+    /// # Examples
+    ///
+    ///
+    /// ```
+    /// let mut did_url = DidUrl::parse("did:example:123").unwrap();
+    /// did_url.set_fragment(Some("controller"));
+    /// assert_eq!(url.as_str(), "did:example:123#controller");
+    /// ```
+    pub fn set_fragment(&mut self, fragment: Option<&str>) {
+        self.url.set_fragment(fragment)
+    }
+
+    /// Return the serialization of this URL.
+    ///
+    /// This is fast since the serialization is already stored in the [`DidUrl`] struct.
+    pub fn as_str(&self) -> &str {
+        self.url.as_str()
+    }
 }
 
 #[derive(Debug, Error)]

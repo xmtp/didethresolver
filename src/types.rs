@@ -3,6 +3,7 @@
 mod did_url;
 
 use serde::{Deserialize, Serialize};
+use smart_default::SmartDefault;
 use url::Url;
 
 pub use did_url::*;
@@ -35,34 +36,58 @@ pub struct Service {
 /// TODO
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct VerificationMethod {
-    id: DidUrl,
-    controller: DidUrl,
-    r#type: VerificationType,
+    pub id: DidUrl,
+    pub controller: DidUrl,
+    #[serde(rename = "type")]
+    pub verification_type: VerificationType,
     #[serde(rename = "publicKeyBase58")]
-    public_key_base58: Option<String>,
+    pub public_key_base58: Option<String>,
     #[serde(rename = "publicKeyBase64")]
-    public_key_base64: Option<String>,
+    pub public_key_base64: Option<String>,
     #[serde(rename = "publicKeyJwk")]
-    public_key_jwk: Option<String>,
+    pub public_key_jwk: Option<String>,
     #[serde(rename = "publicKeyHex")]
-    public_key_hex: Option<String>,
+    pub public_key_hex: Option<String>,
     #[serde(rename = "publicKeyMultibase")]
-    public_key_multibase: Option<String>,
+    pub public_key_multibase: Option<String>,
     #[serde(rename = "blockchain_account_id")]
-    blockchain_account_id: Option<String>,
+    pub blockchain_account_id: Option<String>,
     #[serde(rename = "ethereumAddress")]
-    ethereum_address: Option<String>,
+    pub ethereum_address: Option<String>,
     // does not cover conditional proof2022 subtypes
+}
+
+impl VerificationMethod {
+    pub fn new(id: DidUrl, controller: DidUrl, verification_type: VerificationType) -> Self {
+        Self {
+            id,
+            controller,
+            verification_type,
+            public_key_base58: None,
+            public_key_base64: None,
+            public_key_jwk: None,
+            public_key_hex: None,
+            public_key_multibase: None,
+            blockchain_account_id: None,
+            ethereum_address: None,
+        }
+    }
+
+    pub fn set_blockchain_id(&mut self, id: String) {
+        self.blockchain_account_id = Some(id);
+    }
 }
 
 /// TODO
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ServiceType {
+    #[default]
     MessagingService,
 }
 
 /// TODO
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum VerificationType {
+    #[default]
     Ed25519VerificationKey2020,
 }
