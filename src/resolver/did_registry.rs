@@ -1,8 +1,8 @@
 //! Generated ABI Functions, along with some extra to make it easier to interact with the registry.
 
 use ethers::{
-    contract::{abigen, EthEvent},
-    types::{Address, Bytes, U256, U64},
+    contract::abigen,
+    types::{U256, U64},
 };
 
 pub use self::did_registry::*;
@@ -28,18 +28,6 @@ impl DIDRegistryEvents {
         }
     }
 
-    pub fn identity(&self) -> Address {
-        match self {
-            DIDRegistryEvents::DidattributeChangedFilter(attribute_changed) => {
-                attribute_changed.identity
-            }
-            DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
-                delegate_changed.identity
-            }
-            DIDRegistryEvents::DidownerChangedFilter(owner_changed) => owner_changed.identity,
-        }
-    }
-
     pub fn valid_to(&self) -> Option<U256> {
         match self {
             DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
@@ -48,21 +36,7 @@ impl DIDRegistryEvents {
             DIDRegistryEvents::DidattributeChangedFilter(attribute_changed) => {
                 Some(attribute_changed.valid_to)
             }
-            DIDRegistryEvents::DidownerChangedFilter(owner_changed) => None,
-        }
-    }
-
-    pub fn event_name(&self) -> String {
-        match self {
-            DIDRegistryEvents::DiddelegateChangedFilter(_) => {
-                DiddelegateChangedFilter::name().to_string()
-            }
-            DIDRegistryEvents::DidattributeChangedFilter(_) => {
-                DidattributeChangedFilter::name().to_string()
-            }
-            DIDRegistryEvents::DidownerChangedFilter(_) => {
-                DidownerChangedFilter::name().to_string()
-            }
+            DIDRegistryEvents::DidownerChangedFilter(_) => None,
         }
     }
 }

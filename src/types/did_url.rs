@@ -1,6 +1,5 @@
 //! Convenience Wrapper around [`Url`] for DID URIs according to the [DID Spec](https://www.w3.org/TR/did-core/#did-syntax)
 
-use percent_encoding::PercentDecode;
 use serde::{Deserialize, Serialize, Serializer};
 use std::str::Split;
 use thiserror::Error;

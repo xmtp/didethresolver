@@ -7,7 +7,7 @@ use ethers::types::H160;
 use jsonrpsee::types::ErrorObjectOwned;
 
 use super::api::*;
-use crate::{resolver::Resolver, types::DidDocument, types::DidUrl};
+use crate::{resolver::Resolver, types::DidDocument};
 
 pub struct DidRegistryMethods {
     resolver: Resolver,

@@ -1,9 +1,9 @@
 //! DID Identity Resolver
 mod did_registry;
 
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use ethers::{
     contract::LogMeta,
     prelude::{LocalWallet, Provider, SignerMiddleware},
@@ -11,19 +11,14 @@ use ethers::{
     types::{Address, H160, H256, U256, U64},
 };
 use rand::{rngs::StdRng, SeedableRng};
-use url::Url;
 
-use self::did_registry::{
-    DIDRegistry, DIDRegistryEvents, DidattributeChangedFilter, DiddelegateChangedFilter,
-    DidownerChangedFilter,
-};
-use crate::types::{self, Attribute, DidDocument, DidUrl, KeyPurpose};
+use self::did_registry::{DIDRegistry, DIDRegistryEvents};
+use crate::types::{self, Attribute, DidDocument, KeyPurpose};
 
 pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
 const NULL_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 
 type ResolverSigner = SignerMiddleware<Provider<Ws>, LocalWallet>;
-pub type Record = (String, String);
 
 pub struct Resolver {
     signer: Arc<ResolverSigner>,
@@ -108,75 +103,12 @@ impl Resolver {
 
             let valid_to = event.valid_to().unwrap_or(U256::zero());
 
-            if valid_to >= now {
-                match event {
-                    DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
-                        delegate_count += 1;
-                        let delegate_type =
-                            String::from_utf8_lossy(&delegate_changed.delegate_type);
-                        match &*delegate_type {
-                            "sigAuth" => {
-                                base_document.delegate(
-                                    delegate_count,
-                                    &delegate_changed.delegate,
-                                    KeyPurpose::SignatureAuthentication,
-                                );
-                            }
-                            "veriKey" => {
-                                base_document.delegate(
-                                    delegate_count,
-                                    &delegate_changed.delegate,
-                                    KeyPurpose::VerificationKey,
-                                );
-                            }
-                            d => {
-                                log::warn!("Unsupported or Unknown delegate type {d}");
-                            }
-                        };
-                    }
-                    DIDRegistryEvents::DidattributeChangedFilter(attribute_event) => {
-                        let name = attribute_event.name_string_lossy();
-                        let attribute = types::parse_attribute(&name)
-                            .unwrap_or(Attribute::Other(name.to_string()));
-
-                        match attribute {
-                            Attribute::PublicKey(key) => {
-                                delegate_count += 1;
-                                base_document.external_public_key(
-                                    delegate_count,
-                                    &attribute_event.value,
-                                    key,
-                                );
-                            }
-                            Attribute::Service(service) => {
-                                service_count += 1;
-                                base_document.service(
-                                    service_count,
-                                    &attribute_event.value,
-                                    service,
-                                )?;
-                            }
-                            Attribute::Other(_) => log::trace!(
-                                "Unhandled Attribute {name}:{}",
-                                attribute_event.value_string_lossy()
-                            ),
-                        }
-                    }
-                    _ => (),
-                }
-            } else if let DIDRegistryEvents::DidownerChangedFilter(owner_changed) = event {
-                base_document.controller(&owner_changed.owner);
-                if owner_changed.owner
-                    == Address::from_str(NULL_ADDRESS).expect("Const address is correct")
-                {
-                    log::warn!("This address has been deactivated");
-                }
-            } else {
-                // handle invalid attributes.
-                // Invalid attributes still increment the index of the delegate/service
+            // handle invalid attributes, they just require incrementing our counters
+            if valid_to < now {
                 match event {
                     DIDRegistryEvents::DiddelegateChangedFilter(_) => {
                         delegate_count += 1;
+                        continue;
                     }
                     DIDRegistryEvents::DidattributeChangedFilter(attribute) => {
                         let name = attribute.name_string_lossy();
@@ -189,28 +121,74 @@ impl Resolver {
                             }
                             _ => {}
                         }
+                        continue;
                     }
                     _ => {}
                 }
             }
+
+            match event {
+                DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
+                    delegate_count += 1;
+                    let delegate_type = String::from_utf8_lossy(&delegate_changed.delegate_type);
+                    match &*delegate_type {
+                        "sigAuth" => {
+                            base_document.delegate(
+                                delegate_count,
+                                &delegate_changed.delegate,
+                                KeyPurpose::SignatureAuthentication,
+                            );
+                        }
+                        "veriKey" => {
+                            base_document.delegate(
+                                delegate_count,
+                                &delegate_changed.delegate,
+                                KeyPurpose::VerificationKey,
+                            );
+                        }
+                        d => {
+                            log::warn!("Unsupported or Unknown delegate type {d}");
+                        }
+                    };
+                }
+                DIDRegistryEvents::DidattributeChangedFilter(attribute_event) => {
+                    let name = attribute_event.name_string_lossy();
+                    let attribute =
+                        types::parse_attribute(&name).unwrap_or(Attribute::Other(name.to_string()));
+
+                    match attribute {
+                        Attribute::PublicKey(key) => {
+                            delegate_count += 1;
+                            base_document.external_public_key(
+                                delegate_count,
+                                &attribute_event.value,
+                                key,
+                            );
+                        }
+                        Attribute::Service(service) => {
+                            service_count += 1;
+                            base_document.service(
+                                service_count,
+                                &attribute_event.value,
+                                service,
+                            )?;
+                        }
+                        Attribute::Other(_) => log::trace!(
+                            "Unhandled Attribute {name}:{}",
+                            attribute_event.value_string_lossy()
+                        ),
+                    }
+                }
+                DIDRegistryEvents::DidownerChangedFilter(owner_changed) => {
+                    base_document.controller(&owner_changed.owner);
+                    if owner_changed.owner
+                        == Address::from_str(NULL_ADDRESS).expect("Const address is correct")
+                    {
+                        log::warn!("This address has been deactivated");
+                    }
+                }
+            }
         }
-
         Ok(base_document.build())
-    }
-
-    fn handle_attribute_changed(
-        &self,
-        event: DidattributeChangedFilter,
-        did: DidUrl,
-    ) -> Result<()> {
-        todo!()
-    }
-
-    fn handle_delegate_changed(&self, event: DiddelegateChangedFilter) -> DidUrl {
-        todo!()
-    }
-
-    fn handle_owner_changed(&self, event: DidownerChangedFilter) -> DidUrl {
-        todo!()
     }
 }
