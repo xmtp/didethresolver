@@ -27,18 +27,6 @@ impl DIDRegistryEvents {
             }
         }
     }
-
-    pub fn valid_to(&self) -> Option<U256> {
-        match self {
-            DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
-                Some(delegate_changed.valid_to)
-            }
-            DIDRegistryEvents::DidattributeChangedFilter(attribute_changed) => {
-                Some(attribute_changed.valid_to)
-            }
-            DIDRegistryEvents::DidownerChangedFilter(_) => None,
-        }
-    }
 }
 
 impl DidattributeChangedFilter {

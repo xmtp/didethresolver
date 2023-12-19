@@ -34,8 +34,10 @@ mod tests {
     {
         let server = Server::builder().build("127.0.0.1:0").await.unwrap();
         let addr = server.local_addr().unwrap();
-        let resolver = crate::resolver::Resolver;
-        let handle = server.start(methods::DidRegistryMethods::new().into_rpc());
+        let resolver = crate::resolver::Resolver::new("127.0.0.1:8444")
+            .await
+            .unwrap();
+        let handle = server.start(methods::DidRegistryMethods::new(resolver).into_rpc());
 
         let client = WsClientBuilder::default()
             .build(&format!("ws://{addr}"))

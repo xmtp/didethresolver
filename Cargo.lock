@@ -636,6 +636,7 @@ dependencies = [
  "argh",
  "async-trait",
  "base64 0.21.5",
+ "bs58",
  "ctor",
  "ethers",
  "futures",

@@ -5,12 +5,10 @@ use std::str::Split;
 use thiserror::Error;
 use url::Url;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DidUrl {
     url: Url,
-    #[serde(skip)]
     method_end: usize,
-    #[serde(skip)]
     id_end: usize,
 }
 
@@ -159,6 +157,16 @@ impl Serialize for DidUrl {
     {
         let decoded = percent_encoding::percent_decode_str(self.url.as_str());
         serializer.serialize_str(&decoded.decode_utf8_lossy())
+    }
+}
+
+impl<'de> Deserialize<'de> for DidUrl {
+    fn deserialize<D>(deserializer: D) -> Result<DidUrl, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        DidUrl::parse(&s).map_err(serde::de::Error::custom)
     }
 }
 
