@@ -11,10 +11,13 @@ use ethers::{
     types::{Address, H160, H256, U256, U64},
 };
 use rand::{rngs::StdRng, SeedableRng};
-use sha3::{Digest, Sha3_256};
+use url::Url;
 
-use self::did_registry::{DIDRegistry, DIDRegistryEvents};
-use crate::types::{DidDocument, DidUrl, VerificationMethod, VerificationType};
+use self::did_registry::{
+    DIDRegistry, DIDRegistryEvents, DidattributeChangedFilter, DiddelegateChangedFilter,
+    DidownerChangedFilter,
+};
+use crate::types::{self, Attribute, DidDocument, DidUrl, KeyPurpose};
 
 pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
 const NULL_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
@@ -40,18 +43,8 @@ impl Resolver {
     }
 
     pub async fn resolve_did(&self, public_key: H160) -> Result<DidDocument> {
-        // create a did that resolves an ethereum Address
-        // let did = DidUrl::parse(format!("did:ethr:{public_key}"));
-        let changelog = self.changelog(public_key).await?;
-
-        Ok(DidDocument {
-            context: Default::default(),
-            id: DidUrl::parse("did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad?service=agent&relativeRef=/credentials#degree").unwrap(),
-            also_known_as: None,
-            controller: None,
-            verification_method: None,
-            service: None
-        })
+        let history = self.changelog(public_key).await?;
+        Ok(self.wrap_did_document(public_key, history).await?)
     }
 
     async fn changelog(&self, public_key: H160) -> Result<Vec<(DIDRegistryEvents, LogMeta)>> {
@@ -62,8 +55,6 @@ impl Resolver {
             .await?
             .as_u64()
             .into();
-
-        log::debug!("Block timestamp");
 
         let mut history = Vec::new();
 
@@ -82,8 +73,6 @@ impl Resolver {
                 .await?;
 
             for (event, meta) in events {
-                log::info!("{:?}", event);
-
                 if event.previous_change() < previous_change {
                     previous_change = event.previous_change();
                 }
@@ -93,64 +82,24 @@ impl Resolver {
         Ok(history)
     }
 
-    fn event_key(event: &DIDRegistryEvents) -> String {
-        let event_name = event.event_name();
-        match event {
-            DIDRegistryEvents::DidattributeChangedFilter(attr) => {
-                format!(
-                    "{event_name}-{}-{}",
-                    String::from_utf8_lossy(&attr.name.to_vec()),
-                    String::from_utf8_lossy(&attr.value.to_vec())
-                )
-            }
-            DIDRegistryEvents::DiddelegateChangedFilter(delegate) => {
-                format!(
-                    "{event_name}-{}-{}",
-                    String::from_utf8_lossy(&delegate.delegate_type.to_vec()),
-                    hex::encode(delegate.delegate)
-                )
-            }
-            _ => format!("{event_name}"),
-        }
-    }
-
+    // TODO: Handle version IDs
     async fn wrap_did_document(
         &self,
         public_key: H160,
-        controller_key: Option<H160>,
         history: Vec<(DIDRegistryEvents, LogMeta)>,
-    ) -> Result<()> {
-        let did = DidUrl::parse("did:ethr:{publickey}")?;
-        let base_document = DidDocument {
-            context: vec![
-                "https://www.w3.org/ns/did/v1".try_into()?,
-                "https://w3id.org/security/suites/secp256k1recovery-2020/v2".try_into()?,
-            ],
-            id: did.clone(),
-            also_known_as: None,
-            controller: None,
-            verification_method: None,
-            service: None,
-        };
+    ) -> Result<DidDocument> {
+        let mut base_document = DidDocument::ethr_builder();
+        base_document.public_key(&public_key);
 
         let current_block = self.signer.get_block_number().await?;
-        let current_block = self.signer.get_block(current_block).await.unwrap();
+        let current_block = self.signer.get_block(current_block).await?;
 
         let now = current_block.map(|b| b.timestamp).unwrap_or(U256::zero());
 
-        let mut auth_did = did.clone();
-        let authentication = vec![auth_did.set_fragment(Some("controller"))];
-
-        let mut controller: Option<Address> = None;
         let mut version_id = U64::zero();
-        let next_version_id = u32::MAX;
-        let mut deactivated = false;
-        let mut delegate_count = 0;
-        let service_count = 0;
-        let endpoint = "";
 
-        let mut auth: HashMap<String, DidUrl> = HashMap::new();
-        let mut pks = HashMap::<String, VerificationMethod>::new();
+        let mut delegate_count = 0;
+        let mut service_count = 0;
 
         for (event, meta) in history {
             if version_id < meta.block_number {
@@ -158,7 +107,6 @@ impl Resolver {
             }
 
             let valid_to = event.valid_to().unwrap_or(U256::zero());
-            let event_key = Self::event_key(&event);
 
             if valid_to >= now {
                 match event {
@@ -168,49 +116,101 @@ impl Resolver {
                             String::from_utf8_lossy(&delegate_changed.delegate_type);
                         match &*delegate_type {
                             "sigAuth" => {
-                                let mut did = did.clone();
-                                did.set_fragment(Some(&format!("delegate-{delegate_count}")));
-                                auth.insert(event_key, did);
+                                base_document.delegate(
+                                    delegate_count,
+                                    &delegate_changed.delegate,
+                                    KeyPurpose::SignatureAuthentication,
+                                );
                             }
                             "veriKey" => {
-                                let mut did_delegate = did.clone();
-                                did_delegate
-                                    .set_fragment(Some(&format!("delegate-{delegate_count}")));
-                                let mut verification_method = VerificationMethod::new(
-                                    did_delegate,
-                                    did.clone(),
-                                    VerificationType::Ed25519VerificationKey2020,
+                                base_document.delegate(
+                                    delegate_count,
+                                    &delegate_changed.delegate,
+                                    KeyPurpose::VerificationKey,
                                 );
-                                verification_method.set_blockchain_id(format!(
-                                    "eip155:{}:{}",
-                                    "TODO",
-                                    hex::encode(delegate_changed.delegate)
-                                ));
-
-                                pks.insert(event_key, verification_method);
                             }
                             d => {
                                 log::warn!("Unsupported or Unknown delegate type {d}");
                             }
                         };
                     }
+                    DIDRegistryEvents::DidattributeChangedFilter(attribute_event) => {
+                        let name = attribute_event.name_string_lossy();
+                        let attribute = types::parse_attribute(&name)
+                            .unwrap_or(Attribute::Other(name.to_string()));
 
-                    DIDRegistryEvents::DidattributeChangedFilter(attribute_changed) => {
-                        todo!()
+                        match attribute {
+                            Attribute::PublicKey(key) => {
+                                delegate_count += 1;
+                                base_document.external_public_key(
+                                    delegate_count,
+                                    &attribute_event.value,
+                                    key,
+                                );
+                            }
+                            Attribute::Service(service) => {
+                                service_count += 1;
+                                base_document.service(
+                                    service_count,
+                                    &attribute_event.value,
+                                    service,
+                                )?;
+                            }
+                            Attribute::Other(_) => log::trace!(
+                                "Unhandled Attribute {name}:{}",
+                                attribute_event.value_string_lossy()
+                            ),
+                        }
                     }
                     _ => (),
                 }
+            } else if let DIDRegistryEvents::DidownerChangedFilter(owner_changed) = event {
+                base_document.controller(&owner_changed.owner);
+                if owner_changed.owner
+                    == Address::from_str(NULL_ADDRESS).expect("Const address is correct")
+                {
+                    log::warn!("This address has been deactivated");
+                }
             } else {
-                if let DIDRegistryEvents::DidownerChangedFilter(owner_changed) = event {
-                    controller = Some(owner_changed.owner);
-                    if owner_changed.owner
-                        == Address::from_str(NULL_ADDRESS).expect("Const address is correct")
-                    {
-                        deactivated = true;
+                // handle invalid attributes.
+                // Invalid attributes still increment the index of the delegate/service
+                match event {
+                    DIDRegistryEvents::DiddelegateChangedFilter(_) => {
+                        delegate_count += 1;
                     }
+                    DIDRegistryEvents::DidattributeChangedFilter(attribute) => {
+                        let name = attribute.name_string_lossy();
+                        match types::parse_attribute(&name) {
+                            Ok(Attribute::PublicKey(_)) => {
+                                delegate_count += 1;
+                            }
+                            Ok(Attribute::Service(_)) => {
+                                service_count += 1;
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
-        Ok(())
+
+        Ok(base_document.build())
+    }
+
+    fn handle_attribute_changed(
+        &self,
+        event: DidattributeChangedFilter,
+        did: DidUrl,
+    ) -> Result<()> {
+        todo!()
+    }
+
+    fn handle_delegate_changed(&self, event: DiddelegateChangedFilter) -> DidUrl {
+        todo!()
+    }
+
+    fn handle_owner_changed(&self, event: DidownerChangedFilter) -> DidUrl {
+        todo!()
     }
 }

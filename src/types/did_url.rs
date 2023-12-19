@@ -1,11 +1,12 @@
 //! Convenience Wrapper around [`Url`] for DID URIs according to the [DID Spec](https://www.w3.org/TR/did-core/#did-syntax)
 
-use serde::{Deserialize, Serialize};
+use percent_encoding::PercentDecode;
+use serde::{Deserialize, Serialize, Serializer};
 use std::str::Split;
 use thiserror::Error;
 use url::Url;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct DidUrl {
     url: Url,
     #[serde(skip)]
@@ -144,6 +145,21 @@ impl DidUrl {
     /// This is fast since the serialization is already stored in the [`DidUrl`] struct.
     pub fn as_str(&self) -> &str {
         self.url.as_str()
+    }
+
+    /// Change this DID's path
+    pub fn set_path(&mut self, path: &str) {
+        self.url.set_path(path)
+    }
+}
+
+impl Serialize for DidUrl {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let decoded = percent_encoding::percent_decode_str(self.url.as_str());
+        serializer.serialize_str(&decoded.decode_utf8_lossy())
     }
 }
 

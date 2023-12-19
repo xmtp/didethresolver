@@ -66,3 +66,13 @@ impl DIDRegistryEvents {
         }
     }
 }
+
+impl DidattributeChangedFilter {
+    pub fn value_string_lossy(&self) -> String {
+        String::from_utf8_lossy(self.value.as_ref()).to_string()
+    }
+
+    pub fn name_string_lossy(&self) -> String {
+        String::from_utf8_lossy(self.name.as_ref()).to_string()
+    }
+}

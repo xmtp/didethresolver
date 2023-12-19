@@ -22,12 +22,18 @@ impl DidRegistryMethods {
 #[async_trait]
 impl DidRegistryServer for DidRegistryMethods {
     async fn resolve_did(&self, public_key: String) -> Result<DidDocument, ErrorObjectOwned> {
-        log::debug!("resolve_did called");
-        // placeholder
-        Ok(self
+        log::debug!("did_resolveDid called");
+
+        let result = self
             .resolver
             .resolve_did(H160::from_str(&public_key).unwrap())
-            .await
-            .unwrap())
+            .await;
+        match result {
+            Ok(doc) => Ok(doc),
+            Err(e) => {
+                log::error!("Error resolving DID: {}", e);
+                Err(ErrorObjectOwned::owned(-32000, e.to_string(), None::<()>))
+            }
+        }
     }
 }
