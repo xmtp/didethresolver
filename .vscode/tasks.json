@@ -66,6 +66,19 @@
                 "kind": "test",
                 "isDefault": "true"
             }
+        },
+        {
+            "label": "doc",
+            "type": "shell",
+            "command": "cargo doc --no-deps",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "check",
+            "group": {
+                "kind": "build",
+                "isDefault": "false"
+            }
         }
     ]
 }
