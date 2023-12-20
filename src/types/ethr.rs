@@ -103,24 +103,27 @@ impl EthrBuilder {
     /// When a delegate is added or revoked, a DIDDelegateChanged event is published that MUST be used to update the DID document.
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
-    pub fn delegate_event(&mut self, event: DiddelegateChangedFilter) {
+    pub fn delegate_event(&mut self, event: DiddelegateChangedFilter) -> Result<()> {
         if event.valid_to < self.now {
             self.delegate_count += 1;
-            return;
+            return Ok(());
         }
 
         let delegate_type = String::from_utf8_lossy(&event.delegate_type);
-        match &*delegate_type {
-            "sigAuth" => {
+        let key_purpose = types::parse_delegate(&delegate_type.to_string());
+        match key_purpose {
+            Ok(KeyPurpose::SignatureAuthentication) => {
                 self.delegate(&event.delegate, KeyPurpose::SignatureAuthentication);
             }
-            "veriKey" => {
+            Ok(KeyPurpose::VerificationKey) => {
                 self.delegate(&event.delegate, KeyPurpose::VerificationKey);
             }
-            d => {
-                log::warn!("Unsupported or Unknown delegate type {d}");
+            _ => {
+                log::warn!("Unsupported or Unknown delegate type {delegate_type}");
             }
         };
+
+        Ok(())
     }
 
     /// A general attribute which indicates external services or keys are associated with the DID.
@@ -170,7 +173,11 @@ impl EthrBuilder {
         };
         Ok(())
     }
-
+    
+    ///  The event data MUST be used to update the #controller entry in the verificationMethod array. 
+    ///  When resolving DIDs with publicKey identifiers, if the controller (owner) address is different from the corresponding address of the publicKey, then the #controllerKey entry in the verificationMethod array MUST be omitted.
+    ///
+    ///  referecne: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#controller-changes-didownerchanged)
     pub fn owner_event(&mut self, event: DidownerChangedFilter) -> Result<()> {
         self.controller(&event.owner)?;
         if event.owner == Address::from_str(NULL_ADDRESS).expect("const address is correct") {
@@ -258,9 +265,9 @@ impl EthrBuilder {
         let method = VerificationMethod {
             id: did,
             controller: self.id.clone(),
-            verification_type: KeyType::EcdsaSecp256k1VerificationKey2019,
+            verification_type: KeyType::EcdsaSecp256k1RecoveryMethod2020,
             verification_properties: Some(VerificationMethodProperties::BlockchainAccountId {
-                blockchain_account_id: delegate.to_string(),
+                blockchain_account_id: format!("0x{}", delegate),
             }),
         };
 
@@ -569,5 +576,35 @@ mod tests {
             builder.controller,
             Some(DidUrl::parse("did:ethr:0xfc88f377218e665d8ede610034c4ab2b81e5f9ff").unwrap())
         );
+    }
+
+    #[test]
+    fn test_delegate_changes() {
+        let identity =  address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let events = vec![
+            DiddelegateChangedFilter {
+                identity,
+                delegate_type: *b"veriKey                         ",
+                delegate: address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff"),
+                valid_to: U256::MAX,
+                previous_change: U256::zero()
+            },
+            DiddelegateChangedFilter {
+                identity,
+                delegate_type: *b"sigAuth                         ",
+                delegate: address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff"),
+                valid_to: U256::MAX,
+                previous_change: U256::zero()
+            },
+        ];
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::zero());
+        for event in events {
+            builder.delegate_event(event).unwrap();
+        }
+
+        log::debug!("{:?}", builder.verification_method);
     }
 }

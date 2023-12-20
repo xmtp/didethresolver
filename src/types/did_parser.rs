@@ -5,6 +5,7 @@ use ethers::types::Address;
 use crate::types::*;
 
 pub use did_ethr_attribute_parser::attribute as parse_attribute;
+pub use did_ethr_delegate_parser::delegate as parse_delegate;
 pub use did_ethr_parser::ethr_did as parse_ethr_did;
 
 peg::parser! {
@@ -34,60 +35,71 @@ peg::parser! {
             / key:public_key_hex() { key }
 
         rule mainnet() -> ChainId
-            = "mainnet" { ChainId::Mainnet }
+            = i("mainnet") { ChainId::Mainnet }
 
         rule goerli() -> ChainId
-            = "goerli" {
+            = i("goerli") {
                 #[allow(deprecated)]
                 ChainId::Goerli
             }
 
         rule network_chain_id() -> ChainId
-            = "0x" digits:$(hex_digit()+) {
+            = i("0x") digits:$(hex_digit()+) {
                 ChainId::from(digits)
             }
 
         rule ethereum_address() -> AddressOrHexKey
-            = "0x" digits:$(hex_digit()*{40}) {
+            = i("0x") digits:$(hex_digit()*{40}) {
                 AddressOrHexKey::Address(Address::from_slice(&hex::decode(&digits).unwrap()))
             }
 
         rule public_key_hex() -> AddressOrHexKey
-            = "0x" digits:$(hex_digit()*{66}) { AddressOrHexKey::HexKey(hex::decode(digits).unwrap()) }
+            = i("0x") digits:$(hex_digit()*{66}) { AddressOrHexKey::HexKey(hex::decode(digits).unwrap()) }
 
         rule hex_digit() -> String
            = digits:$(['0'..='9' | 'a'..='f' | 'A'..='F']) { digits.to_string() }
+
+        // case insensitive rule (see https://github.com/kevinmehall/rust-peg/issues/216)
+        rule i(literal: &'static str)
+            = input:$([_]*<{literal.len()}>)
+            {? if input.eq_ignore_ascii_case(literal) { Ok(()) } else { Err(literal) } }
     }
 }
 
 peg::parser! {
     grammar did_ethr_attribute_parser() for str {
+
+        // case insensitive rule (see https://github.com/kevinmehall/rust-peg/issues/216)
+        rule i(literal: &'static str)
+            = input:$([_]*<{literal.len()}>)
+            {? if input.eq_ignore_ascii_case(literal) { Ok(()) } else { Err(literal) } }
+
         rule padding() = [ ' '  | '0' ]*
 
         rule secp256k1() -> KeyType
-            = "Secp256k1" { KeyType::EcdsaSecp256k1VerificationKey2019 }
+            = i("Secp256k1") { KeyType::EcdsaSecp256k1VerificationKey2019 }
 
         rule ed25519() -> KeyType
-            = "Ed25519" { KeyType::Ed25519VerificationKey2020 }
+            = i("Ed25519") { KeyType::Ed25519VerificationKey2020 }
 
         rule rsa() -> KeyType
-            = "RSA" { KeyType::RsaVerificationKey2018 }
+            = i("RSA") { KeyType::RsaVerificationKey2018 }
 
         rule x25519() -> KeyType
-            = "X25519" { KeyType::X25519KeyAgreementKey2019 }
+            = i("X25519") { KeyType::X25519KeyAgreementKey2019 }
 
         rule key_type() -> KeyType
             = kt:(secp256k1() / ed25519() / rsa() / x25519() ) { kt }
 
         rule key_purpose() -> KeyPurpose
-            = "veriKey" { KeyPurpose::VerificationKey } / "sigAuth" { KeyPurpose::SignatureAuthentication } / "enc" { KeyPurpose::Encryption }
+            = i("veriKey") { KeyPurpose::VerificationKey } / "sigAuth" { KeyPurpose::SignatureAuthentication } / "enc" { KeyPurpose::Encryption }
 
         rule encoding() -> KeyEncoding
-            = "hex" { KeyEncoding::Hex } / "base64" { KeyEncoding::Base64 } / "base58" { KeyEncoding::Base58 }
+            = i("hex") { KeyEncoding::Hex } / "base64" { KeyEncoding::Base64 } / "base58" { KeyEncoding::Base58 }
 
 
         rule messaging_service() -> ServiceType
-            = "MessagingService"  { ServiceType::Messaging }
+            = i("MessagingService")  { ServiceType::Messaging }
 
         rule other_service() -> ServiceType
             = svc:$([ 'a'..='z' | 'A'..='Z' | '0'..='9']+) { ServiceType::Other(svc.to_string()) }
@@ -109,6 +121,29 @@ peg::parser! {
             }
             / svc:service() { Attribute::Service(svc) }
         }
+}
+
+peg::parser! {
+    grammar did_ethr_delegate_parser() for str {
+        // case insensitive rule (see https://github.com/kevinmehall/rust-peg/issues/216)
+        rule i(literal: &'static str)
+            = input:$([_]*<{literal.len()}>)
+            {? if input.eq_ignore_ascii_case(literal) { Ok(()) } else { Err(literal) } }
+
+        rule padding() = [ ' ' | '0' ]*
+
+        rule veri_key() -> KeyPurpose
+            = quiet!{ i("veriKey") } { KeyPurpose::VerificationKey }
+
+        rule sig_auth() -> KeyPurpose
+            = quiet!{ i("sigAuth") } { KeyPurpose::SignatureAuthentication }
+
+        rule key_purpose() -> KeyPurpose
+            = kp:(veri_key() / sig_auth() / expected!("the only supported delegate types are `sigAuth` and `veriKey`")) { kp }
+
+        pub rule delegate() -> KeyPurpose
+            = quiet! { padding() } kp:key_purpose() quiet! { padding() } { kp }
+    }
 }
 
 #[cfg(test)]
@@ -165,7 +200,6 @@ mod tests {
 
     #[test]
     fn test_ethr_method_parser() {
-        log::debug!("First");
         let parsed =
             parse_ethr_did("ethr:mainnet:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
         assert_eq!(
@@ -196,5 +230,26 @@ mod tests {
                 }
             }
         )
+    }
+
+    #[test]
+    fn test_ethr_delegate_parser() {
+        let parsed = parse_delegate("sigAuth").unwrap();
+        assert_eq!(parsed, KeyPurpose::SignatureAuthentication);
+
+        let parsed = parse_delegate("veriKey").unwrap();
+        assert_eq!(parsed, KeyPurpose::VerificationKey);
+
+        let parsed = parse_delegate("verikey").unwrap();
+        assert_eq!(parsed, KeyPurpose::VerificationKey);
+
+        let parsed = parse_delegate("sigauth").unwrap();
+        assert_eq!(parsed, KeyPurpose::SignatureAuthentication);
+
+        let parsed = parse_delegate("enc").unwrap_err();
+        assert_eq!(
+            parsed.to_string(),
+            "error at 1:1: expected the only supported delegate types are `sigAuth` and `veriKey`"
+        );
     }
 }
