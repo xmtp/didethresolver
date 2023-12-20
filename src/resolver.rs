@@ -76,7 +76,6 @@ impl Resolver {
         Ok(history)
     }
 
-    // TODO: Handle version IDs, deactivation
     async fn wrap_did_document(
         &self,
         public_key: H160,

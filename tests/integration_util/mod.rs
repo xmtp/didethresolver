@@ -6,7 +6,9 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 
 // TODO: Would be nice to use the anvil library instead of a CLI interface
 use anyhow::Result;
-use didethresolver::{did_registry::DIDRegistry, DidRegistryMethods, DidRegistryServer, Resolver, types::DidDocument};
+use didethresolver::{
+    did_registry::DIDRegistry, types::DidDocument, DidRegistryMethods, DidRegistryServer, Resolver,
+};
 use ethers::{
     core::utils::{Anvil, AnvilInstance},
     middleware::SignerMiddleware,
@@ -19,7 +21,7 @@ use jsonrpsee::{
     server::Server,
     ws_client::{WsClient, WsClientBuilder},
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tokio::time::timeout as timeout_tokio;
 
 static INIT: Once = Once::new();
@@ -135,11 +137,16 @@ pub struct Message {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationResponse {
     infos: Vec<Message>,
-    valid: bool
+    valid: bool,
 }
 
-pub async fn validate_document(document: DidDocument) {
-    log::debug!("document={}", serde_json::to_string_pretty(&document).unwrap());
+// TODO: Should use the installable didlint command, to make testing faster
+/// Validate a DID Document using the didlint service
+pub async fn validate_document(document: &DidDocument) {
+    log::debug!(
+        "document={}",
+        serde_json::to_string_pretty(&document).unwrap()
+    );
     let endpoint = "https://didlint.ownyourdata.eu/api/validate";
     let res = surf::post(endpoint)
         .body(surf::Body::from_json(&document).unwrap())

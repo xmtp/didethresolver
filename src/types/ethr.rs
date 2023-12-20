@@ -91,7 +91,6 @@ impl EthrBuilder {
     /// Set the controller of the document
     pub fn controller(&mut self, controller: &Address) -> Result<()> {
         let mut did = self.id.clone();
-        // TODO: Include a `set_id` method on `DidUrl
         did.set_path(&format!("ethr:0x{}", hex::encode(&controller)))?;
         self.controller = Some(did);
         Ok(())
@@ -105,7 +104,6 @@ impl EthrBuilder {
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
     pub fn delegate_event(&mut self, event: DiddelegateChangedFilter) -> Result<()> {
         if event.valid_to < self.now {
-            self.delegate_count += 1;
             return Ok(());
         }
 
@@ -123,6 +121,7 @@ impl EthrBuilder {
             }
         };
 
+        self.delegate_count += 1;
         Ok(())
     }
 
@@ -173,8 +172,8 @@ impl EthrBuilder {
         };
         Ok(())
     }
-    
-    ///  The event data MUST be used to update the #controller entry in the verificationMethod array. 
+
+    ///  The event data MUST be used to update the #controller entry in the verificationMethod array.
     ///  When resolving DIDs with publicKey identifiers, if the controller (owner) address is different from the corresponding address of the publicKey, then the #controllerKey entry in the verificationMethod array MUST be omitted.
     ///
     ///  referecne: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#controller-changes-didownerchanged)
@@ -267,7 +266,7 @@ impl EthrBuilder {
             controller: self.id.clone(),
             verification_type: KeyType::EcdsaSecp256k1RecoveryMethod2020,
             verification_properties: Some(VerificationMethodProperties::BlockchainAccountId {
-                blockchain_account_id: format!("0x{}", delegate),
+                blockchain_account_id: format!("0x{}", hex::encode(delegate)),
             }),
         };
 
@@ -580,21 +579,21 @@ mod tests {
 
     #[test]
     fn test_delegate_changes() {
-        let identity =  address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let events = vec![
             DiddelegateChangedFilter {
                 identity,
                 delegate_type: *b"veriKey                         ",
                 delegate: address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff"),
                 valid_to: U256::MAX,
-                previous_change: U256::zero()
+                previous_change: U256::zero(),
             },
             DiddelegateChangedFilter {
                 identity,
                 delegate_type: *b"sigAuth                         ",
                 delegate: address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff"),
                 valid_to: U256::MAX,
-                previous_change: U256::zero()
+                previous_change: U256::zero(),
             },
         ];
 
@@ -605,6 +604,45 @@ mod tests {
             builder.delegate_event(event).unwrap();
         }
 
-        log::debug!("{:?}", builder.verification_method);
+        assert_eq!(
+            builder.verification_method[0],
+            VerificationMethod {
+                id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
+                    .unwrap(),
+                verification_type: KeyType::EcdsaSecp256k1RecoveryMethod2020,
+                controller: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f")
+                    .unwrap(),
+                verification_properties: Some(VerificationMethodProperties::BlockchainAccountId {
+                    // TODO: Handle chain_id
+                    blockchain_account_id: "0xfc88f377218e665d8ede610034c4ab2b81e5f9ff".into()
+                })
+            }
+        );
+
+        assert_eq!(
+            builder.verification_method[1],
+            VerificationMethod {
+                id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1")
+                    .unwrap(),
+                verification_type: KeyType::EcdsaSecp256k1RecoveryMethod2020,
+                controller: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f")
+                    .unwrap(),
+                verification_properties: Some(VerificationMethodProperties::BlockchainAccountId {
+                    // TODO: Handle chain_id
+                    blockchain_account_id: "0xfc88f377218e665d8ede610034c4ab2b81e5f9ff".into()
+                })
+            }
+        );
+
+        assert_eq!(
+            DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
+                .unwrap(),
+            builder.assertion_method[0]
+        );
+        assert_eq!(
+            DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1")
+                .unwrap(),
+            builder.authentication[0]
+        );
     }
 }

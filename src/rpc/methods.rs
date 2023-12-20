@@ -28,7 +28,7 @@ impl DidRegistryServer for DidRegistryMethods {
             .resolver
             .resolve_did(H160::from_str(&public_key).unwrap())
             .await;
-        
+
         match result {
             Ok(doc) => Ok(doc),
             Err(e) => {

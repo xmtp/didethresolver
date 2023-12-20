@@ -116,7 +116,6 @@ pub enum VerificationMethodProperties {
         #[serde(rename = "publicKeyMultibase")]
         public_key_multibase: String,
     },
-    // TODO: Handle EIP55 (checksum)
     BlockchainAccountId {
         #[serde(rename = "blockchainAccountId")]
         blockchain_account_id: String,
