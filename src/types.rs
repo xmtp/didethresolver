@@ -169,7 +169,6 @@ impl<'a> From<&'a str> for ServiceType {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KeyType {
     JsonWebKey2020,
-
     Ed25519VerificationKey2020,
     EcdsaSecp256k1RecoveryMethod2020,
     EcdsaSecp256k1VerificationKey2019,
