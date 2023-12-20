@@ -106,15 +106,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "asdf"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "libresolver",
- "tokio",
-]
-
-[[package]]
 name = "async-lock"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -635,6 +626,37 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "didethresolver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argh",
+ "async-trait",
+ "base64 0.21.5",
+ "bs58",
+ "ctor",
+ "ethers",
+ "futures",
+ "hex",
+ "jsonrpsee",
+ "log",
+ "mockall",
+ "peg",
+ "percent-encoding",
+ "rand",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha3",
+ "smart-default",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
@@ -1989,37 +2011,6 @@ dependencies = [
  "bitflags 2.4.1",
  "libc",
  "redox_syscall",
-]
-
-[[package]]
-name = "libresolver"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "argh",
- "async-trait",
- "base64 0.21.5",
- "bs58",
- "ctor",
- "ethers",
- "futures",
- "hex",
- "jsonrpsee",
- "log",
- "mockall",
- "peg",
- "percent-encoding",
- "rand",
- "regex",
- "serde",
- "serde_json",
- "sha3",
- "smart-default",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
 ]
 
 [[package]]

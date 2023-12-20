@@ -8,7 +8,7 @@ use ethers::{
     contract::LogMeta,
     prelude::{LocalWallet, Provider, SignerMiddleware},
     providers::{Middleware, Ws},
-    types::{Address, H160, H256, U256, U64},
+    types::{H160, H256, U256, U64},
 };
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -16,7 +16,6 @@ use self::did_registry::{DIDRegistry, DIDRegistryEvents};
 use crate::types::DidDocument;
 
 pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
-const NULL_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 
 type ResolverSigner = SignerMiddleware<Provider<Ws>, LocalWallet>;
 
@@ -84,7 +83,7 @@ impl Resolver {
         history: Vec<(DIDRegistryEvents, LogMeta)>,
     ) -> Result<DidDocument> {
         let mut base_document = DidDocument::ethr_builder();
-        base_document.public_key(&public_key);
+        base_document.public_key(&public_key)?;
 
         let current_block = self.signer.get_block_number().await?;
         let current_block = self.signer.get_block(current_block).await?;
@@ -107,24 +106,10 @@ impl Resolver {
                     base_document.attribute_event(attribute_event)?;
                 }
                 DIDRegistryEvents::DidownerChangedFilter(owner_changed) => {
-                    base_document.controller(&owner_changed.owner);
-                    if owner_changed.owner
-                        == Address::from_str(NULL_ADDRESS).expect("Const address is correct")
-                    {
-                        log::warn!("This address has been deactivated");
-                    }
+                    base_document.owner_event(owner_changed)?;
                 }
             }
         }
         Ok(base_document.build())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn test_attribute_changed() {
-        todo!()
     }
 }

@@ -1,9 +1,6 @@
 //! Generated ABI Functions, along with some extra to make it easier to interact with the registry.
 
-use ethers::{
-    contract::abigen,
-    types::{U256, U64},
-};
+use ethers::{contract::abigen, types::U64};
 
 pub use self::did_registry::*;
 

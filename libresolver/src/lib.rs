@@ -7,7 +7,7 @@ use anyhow::Result;
 use argh::FromArgs;
 use jsonrpsee::server::Server;
 
-use crate::{resolver::Resolver, rpc::DidRegistryServer};
+pub use crate::{resolver::Resolver, rpc::DidRegistryServer};
 
 #[derive(FromArgs)]
 /// DID Ethereum Resolver XMTP Gateway
@@ -25,8 +25,8 @@ struct DidEthGatewayApp {
     provider: String,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+/// Entrypoint for the DID:Ethr Gateway
+pub async fn run() -> Result<()> {
     crate::util::init_logging();
     let opts: DidEthGatewayApp = argh::from_env();
 

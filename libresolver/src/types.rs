@@ -11,6 +11,9 @@ pub use did_parser::*;
 pub use did_url::*;
 pub use ethr::*;
 
+/// The ethereum null addresss
+pub const NULL_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
+
 /// A DID Document, based on the did specification, [DID Document Properties](https://www.w3.org/TR/did-core/#did-document-properties)
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DidDocument {
@@ -113,6 +116,7 @@ pub enum VerificationMethodProperties {
         #[serde(rename = "publicKeyMultibase")]
         public_key_multibase: String,
     },
+    // TODO: Handle EIP55 (checksum)
     BlockchainAccountId {
         #[serde(rename = "blockchainAccountId")]
         blockchain_account_id: String,
@@ -160,7 +164,8 @@ pub enum DelegateType {
 pub enum KeyType {
     JsonWebKey2020,
     Ed25519VerificationKey2020,
-    EcdsaSecp256kRecoveryMethod2020,
+    EcdsaSecp256k1RecoveryMethod2020,
+    EcdsaSecp256k1VerificationKey2019,
     RsaVerificationKey2018,
     X25519KeyAgreementKey2019,
 }
@@ -170,7 +175,8 @@ impl From<KeyType> for String {
         match kt {
             KeyType::JsonWebKey2020 => "jwk".into(),
             KeyType::Ed25519VerificationKey2020 => "Ed25519".into(),
-            KeyType::EcdsaSecp256kRecoveryMethod2020 => "Secp256k1".into(),
+            KeyType::EcdsaSecp256k1RecoveryMethod2020 => "Secp256k1".into(),
+            KeyType::EcdsaSecp256k1VerificationKey2019 => "Secp256k1".into(),
             KeyType::RsaVerificationKey2018 => "RSA".into(),
             KeyType::X25519KeyAgreementKey2019 => "X25519".into(),
         }
@@ -228,7 +234,14 @@ pub enum Attribute {
 #[cfg(test)]
 mod test {
     use super::*;
+    use ethers::types::Address;
     use serde_json::json;
+
+    /// Get an address from a hex string
+    pub fn address(s: &str) -> Address {
+        let s = s.strip_prefix("0x").unwrap_or(s);
+        Address::from_slice(&hex::decode(s).unwrap())
+    }
 
     #[test]
     fn test_serialization_of_document() {
