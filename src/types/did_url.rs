@@ -93,12 +93,17 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
+    /// use didethresolver::types::DidUrl;
+    ///
     /// let did_url = "did:not:123";
-    /// let did_url = DidUrl::parse(did_urL).expect("Failed to parse DID URI");
+    /// let did_url = DidUrl::parse(did_url).unwrap_err();
+    /// assert_eq!(did_url.source().unwrap().to_string(), "error at 1:1: expected one of \"ethr:\", the only supported method is `ethr`");
     /// ```
     /// ```
-    /// let did_url = "did:ethr";
-    /// let did_url = DidUrl::parse(did_url)?;
+    /// use didethresolver::types::DidUrl;
+    ///
+    /// let did_url = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+    /// let did_url = DidUrl::parse(did_url).unwrap();
     /// ```
     ///
     /// # Errors
@@ -135,8 +140,10 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// let did_url = DidUrl::parse("did:ethr:123").unwrap();
-    /// assert_eq!(did_url.method(), Method::Ethr);
+    /// use didethresolver::types::{DidUrl, Method};
+    ///
+    /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+    /// assert_eq!(did_url.method(), &Method::Ethr);
     /// ```
     ///
     pub fn method(&self) -> &Method {
@@ -150,8 +157,9 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// let did_url = DidUrl::parse("did:ethr:0x1:123").unwrap();
-    /// assert_eq!(did_url.id(), ChainId::Mainnet);
+    /// use didethresolver::types::{ChainId, DidUrl};
+    /// let did_url = DidUrl::parse("did:ethr:0x01:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+    /// assert_eq!(did_url.chain_id(), &ChainId::Mainnet);
     /// ```
     ///
     /// ```
@@ -167,8 +175,12 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
+    /// use didethresolver::types::{AddressOrHexKey, DidUrl};
+    /// use ethers::types::Address;
+    ///
     /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-    /// assert_eq!(did_url.id(), AddressOrHexKey::Address(Address::from_slice(hex::decode("0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap())));
+    /// let address = hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+    /// assert_eq!(did_url.id(), &AddressOrHexKey::Address(Address::from_slice(address.as_slice())));
     /// ```
     ///
     pub fn id(&self) -> &AddressOrHexKey {
@@ -183,8 +195,10 @@ impl DidUrl {
     ///
     ///  # Examples
     /// ```
-    /// let did_url = DidUrl::parse("did:example:123456789abcdefghi#keys-1").unwrap();
-    /// assert_eq!(did_url.fragment(), Some("keys-1"));
+    /// use didethresolver::types::DidUrl;
+    ///
+    /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#delegate-0").unwrap();
+    /// assert_eq!(did_url.fragment(), Some("delegate-0"));
     /// ```
     ///
     /// **Note**: the parser did not percent-encode this component, but the input may have been percent-encoded already.
@@ -198,9 +212,11 @@ impl DidUrl {
     ///
     ///
     /// ```
-    /// let mut did_url = DidUrl::parse("did:example:123").unwrap();
+    /// use didethresolver::types::DidUrl;
+    ///
+    /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// did_url.set_fragment(Some("controller"));
-    /// assert_eq!(url.as_str(), "did:example:123#controller");
+    /// assert_eq!(did_url.as_str(), "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller");
     /// ```
     pub fn set_fragment(&mut self, fragment: Option<&str>) {
         self.url.set_fragment(fragment)
@@ -220,9 +236,11 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// let mut did_url = DidUrl::parse("did:example:123").unwrap();
-    /// did_url.set_path("did:example:123#controller");
-    /// assert_eq!(url.as_str(), "did:example:123#controller");
+    /// use didethresolver::types::DidUrl;
+    ///
+    /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+    /// did_url.set_path("ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
+    /// assert_eq!(did_url.as_str(), "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
     /// ```
     ///
     /// # Errors

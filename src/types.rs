@@ -1,4 +1,5 @@
-//! Type Definitions for the DID Registry compatible with JSON
+//! Type Definitions adhering to the [DID Specification](https://www.w3.org/TR/did-core/#abstract)
+//! and [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#method-specific-identifier)
 
 mod did_parser;
 mod did_url;
@@ -69,11 +70,15 @@ impl DidDocument {
 /// Represents a service associated with a DID.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Service {
+    /// The unique identifier of the service.
     pub id: DidUrl,
+    /// The type of the service (e.g., messaging, hub, etc.).
     #[serde(rename = "type")]
     pub service_type: ServiceType,
+    /// The URL representing the service endpoint.
     #[serde(rename = "serviceEndpoint")]
     pub service_endpoint: Url,
+    /// A string listing recipient keys associated with the service.
     #[serde(rename = "recipientKeys")]
     pub recipient_keys: String,
 }
@@ -81,41 +86,48 @@ pub struct Service {
 /// Describes a method for verifying a DID.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct VerificationMethod {
+    /// The unique identifier of the verification method, typically a DID URL.
     pub id: DidUrl,
+    /// The DID URL of the controller for this verification method.
     pub controller: DidUrl,
+    /// The type of the verification method (e.g., cryptographic key type).
     #[serde(rename = "type")]
     pub verification_type: KeyType,
+    /// the public key and its encoding
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub verification_properties: Option<VerificationMethodProperties>,
 }
 
-// Not present b/c deprecated
-// public_key_base58 DEPRECATED, use publicKeyMultibase or publicKeyJwk instead
-// public_key_hex DEPRECATED, use publicKeyMultibase or publicKeyJwk
-// pub ethereum_address  DEPRECATED, use blockchain_account_id instead
+/// TODO
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum VerificationMethodProperties {
+    /// Public key encoded as hex
     PublicKeyHex {
         #[serde(rename = "publicKeyHex")]
         public_key_hex: String,
     },
+    /// Public key encoded as base64, using the default alphabet
     PublicKeyBase64 {
         #[serde(rename = "publicKeyBase64")]
         public_key_base64: String,
     },
+    /// Public key encoded as base58
     PublicKeyBase58 {
         #[serde(rename = "publicKeyBase58")]
         public_key_base58: String,
     },
+    /// Public key as a Json-Web-Key
     PublicKeyJwk {
         #[serde(rename = "publicKeyJwk")]
         public_key_jwk: String,
     },
+    /// Public key in Multibase format
     PublicKeyMultibase {
         #[serde(rename = "publicKeyMultibase")]
         public_key_multibase: String,
     },
+    /// Blockcahin account identitfier, case insensitive (does not support EIP-55)
     BlockchainAccountId {
         #[serde(rename = "blockchainAccountId")]
         blockchain_account_id: String,
@@ -133,12 +145,14 @@ impl VerificationMethod {
     }
 }
 
-/// TODO
+/// Represents different types of services associated with a DID.
+/// Currently, only [`ServiceType::Messaging`] is directly supported
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ServiceType {
+    /// Specific serice type for messaging
     #[serde(rename = "MessagingService")]
     Messaging,
-    /// Other Service type, unsupported
+    /// Other Service type, not directly supported
     Other(String),
 }
 
@@ -151,17 +165,11 @@ impl<'a> From<&'a str> for ServiceType {
     }
 }
 
-/// TODO
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub enum DelegateType {
-    SignatureAuthentication,
-    VerificationKey,
-}
-
-/// TODO
+/// Various cryptographic key types defined in the [DID Specification](https://www.w3.org/TR/did-spec-registries/#verification-method-types)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KeyType {
     JsonWebKey2020,
+
     Ed25519VerificationKey2020,
     EcdsaSecp256k1RecoveryMethod2020,
     EcdsaSecp256k1VerificationKey2019,
@@ -199,13 +207,6 @@ impl From<KeyPurpose> for String {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum KeyEncoding {
-    Hex,
-    Base64,
-    Base58,
-}
-
 impl From<KeyEncoding> for String {
     fn from(enc: KeyEncoding) -> String {
         match enc {
@@ -216,18 +217,28 @@ impl From<KeyEncoding> for String {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct PublicKey {
-    pub key_type: KeyType,
-    pub purpose: KeyPurpose,
-    pub encoding: KeyEncoding,
-}
-
+/// A parsed did:ethr did:ethr attribute name value, returned from [`parse_attribute`]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Attribute {
     PublicKey(PublicKey),
     Service(ServiceType),
     Other(String),
+}
+
+/// Indicates the encoding of a key in a did:ethr attribute
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KeyEncoding {
+    Hex,
+    Base64,
+    Base58,
+}
+
+/// Indicates the Public Key Type, Purpose, and Encoding from a did:ethr attribute name
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct PublicKey {
+    pub key_type: KeyType,
+    pub purpose: KeyPurpose,
+    pub encoding: KeyEncoding,
 }
 
 #[cfg(test)]

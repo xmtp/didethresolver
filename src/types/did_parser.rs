@@ -10,6 +10,25 @@ pub use did_ethr_parser::ethr_did as parse_ethr_did;
 
 peg::parser! {
     grammar did_ethr_parser() for str {
+        /// parses the `path` part of a [DID-URL](https://www.w3.org/TR/did-core/#did-syntax)
+        ///
+        /// # Example
+        /// ```rust
+        /// use didethresolver::types::{Method, Id, ChainId, AddressOrHexKey, MethodAndId, parse_ethr_did};
+        /// use ethers::types::Address;
+        /// let parsed = parse_ethr_did("ethr:mainnet:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        /// assert_eq!(
+        ///    parsed,
+        ///    MethodAndId {
+        ///        method: Method::Ethr,
+        ///        id: Id {
+        ///            chain: ChainId::Mainnet,
+        ///            public_key: AddressOrHexKey::Address(Address::from_slice(
+        ///                &hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap()
+        ///            ))
+        ///        }
+        ///   });
+        /// ```
         pub rule ethr_did() -> MethodAndId
             = method:method() id:id() { MethodAndId { method, id } }
 
@@ -44,17 +63,19 @@ peg::parser! {
             }
 
         rule network_chain_id() -> ChainId
-            = i("0x") digits:$(hex_digit()+) {
+            = "0" i("x") digits:$(hex_digit()+) {
                 ChainId::from(digits)
             }
 
         rule ethereum_address() -> AddressOrHexKey
-            = i("0x") digits:$(hex_digit()*{40}) {
+            = "0" i("x") digits:$(hex_digit()*<40>) {
                 AddressOrHexKey::Address(Address::from_slice(&hex::decode(&digits).unwrap()))
             }
 
         rule public_key_hex() -> AddressOrHexKey
-            = i("0x") digits:$(hex_digit()*{66}) { AddressOrHexKey::HexKey(hex::decode(digits).unwrap()) }
+            = "0" i("x") digits:$(hex_digit()*<66>) {
+                AddressOrHexKey::HexKey(hex::decode(digits).unwrap())
+            }
 
         rule hex_digit() -> String
            = digits:$(['0'..='9' | 'a'..='f' | 'A'..='F']) { digits.to_string() }
@@ -141,6 +162,7 @@ peg::parser! {
         rule key_purpose() -> KeyPurpose
             = kp:(veri_key() / sig_auth() / expected!("the only supported delegate types are `sigAuth` and `veriKey`")) { kp }
 
+        /// Parses the delegate type from a did:ethr attribute name (either `sigAuth` or `veriKey`)
         pub rule delegate() -> KeyPurpose
             = quiet! { padding() } kp:key_purpose() quiet! { padding() } { kp }
     }
@@ -215,7 +237,6 @@ mod tests {
             }
         );
 
-        log::debug!("second");
         // Mainnet is default
         let parsed = parse_ethr_did("ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
         assert_eq!(
@@ -229,7 +250,22 @@ mod tests {
                     ))
                 }
             }
-        )
+        );
+
+        let parsed =
+            parse_ethr_did("ethr:0x01:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        assert_eq!(
+            parsed,
+            MethodAndId {
+                method: Method::Ethr,
+                id: Id {
+                    chain: ChainId::Mainnet,
+                    public_key: AddressOrHexKey::Address(Address::from_slice(
+                        &hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap()
+                    ))
+                }
+            }
+        );
     }
 
     #[test]
