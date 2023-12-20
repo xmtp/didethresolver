@@ -133,6 +133,8 @@ peg::parser! {
                 (kt, kp, enc)
             }
 
+        /// Parses the DID attribute name value
+        ///
         /// Parses the `did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc)/(hex|base64|base58)` part of a DID attribute name for adding a public key,
         /// or the `did/svc/[ServiceName]` part for adding a service
         pub rule attribute() -> Attribute
