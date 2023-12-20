@@ -73,6 +73,8 @@ impl Resolver {
                 history.push((event, meta));
             }
         }
+
+        history.reverse();
         Ok(history)
     }
 

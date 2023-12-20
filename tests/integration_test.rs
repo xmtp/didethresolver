@@ -1,10 +1,9 @@
 mod integration_util;
 
 use anyhow::Result;
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use didethresolver::{
     rpc::DidRegistryClient,
-    types::{DidUrl, VerificationMethodProperties},
+    types::{DidUrl, KeyType, VerificationMethodProperties},
 };
 use ethers::{
     signers::{LocalWallet, Signer as _},
@@ -27,7 +26,7 @@ pub async fn test_attributes() -> Result<()> {
         let did = registry.set_attribute(
             me,
             *b"did/pub/Ed25519/veriKey/base64  ",
-            b"f3beac30c498d9e26865f34fcaa57dbb935b0d74".into(),
+            b"302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052".into(),
             U256::from(604_800),
         );
         did.send().await?.await?;
@@ -44,7 +43,31 @@ pub async fn test_attributes() -> Result<()> {
             DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
         );
         assert_eq!(
+            document.verification_method[0].verification_type,
+            KeyType::EcdsaSecp256k1VerificationKey2019
+        );
+        assert_eq!(
             document.verification_method[0].verification_properties,
+            Some(VerificationMethodProperties::PublicKeyHex {
+                public_key_hex:
+                    "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".to_string()
+            })
+        );
+
+        assert_eq!(
+            document.verification_method[1].id,
+            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+        );
+        assert_eq!(
+            document.verification_method[1].controller,
+            DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
+        );
+        assert_eq!(
+            document.verification_method[1].verification_type,
+            KeyType::Ed25519VerificationKey2020
+        );
+        assert_eq!(
+            document.verification_method[1].verification_properties,
             Some(VerificationMethodProperties::PublicKeyBase64 {
                 public_key_base64: "MCowBQYDK2VuAyEAEYVXd3/7B4d0NxpSsA/tdVYdz5deYcR1U+ZkphdmEFI="
                     .to_string()

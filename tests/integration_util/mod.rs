@@ -50,7 +50,7 @@ type Signer = SignerMiddleware<Provider<Ws>, LocalWallet>;
 /// If the `anvil` binary is not available in `$PATH`, the test will panic.
 pub async fn with_client<F, R, T>(timeout: Option<Duration>, fun: F) -> Result<T>
 where
-    F: FnOnce(WsClient, DIDRegistry<Signer>, Arc<Signer>, AnvilInstance) -> R + 'static,
+    F: FnOnce(WsClient, DIDRegistry<Signer>, Arc<Signer>, Arc<AnvilInstance>) -> R + 'static,
     R: Future<Output = Result<T>> + FutureExt + Send + 'static,
 {
     init_logging();
@@ -79,6 +79,7 @@ where
         .await
         .unwrap();
 
+    let anvil = Arc::new(anvil);
     // cant catch_unwind b/c jsonrpsee uses tokio mpsc which is !UnwindSafe, so we wrap with a
     // timeout.
     // If we panic in the closure without the timeout or catch_unwind, we never return and the server will never stop, hanging our
@@ -86,12 +87,16 @@ where
     let result = timeout_tokio(
         // this is long b/c of the call to didlint
         timeout.unwrap_or(Duration::from_secs(10)),
-        fun(client, registry, user, anvil),
+        fun(client, registry, user, anvil.clone()),
     )
     .await;
 
     handle.stop().unwrap();
     handle.stopped().await;
+
+    // it's important to keep a reference to anvil alive, even if we don't use it after or in the
+    // predicate, `fun`, because otherwise our server will shutoff.
+    drop(anvil);
 
     match result {
         Ok(v) => v,
@@ -141,6 +146,7 @@ pub struct ValidationResponse {
 }
 
 // TODO: Should use the installable didlint command, to make testing faster
+
 /// Validate a DID Document using the didlint service
 pub async fn validate_document(document: &DidDocument) {
     log::debug!(

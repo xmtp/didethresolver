@@ -16,6 +16,10 @@ pub use crate::{
     rpc::DidRegistryServer,
 };
 
+// TODO: Get registry address from environment variable, or configuration file
+// in order to support multiple chains, we may need to support multiple providers via RPC
+// so it could be worth defining a config file that maps chainId to RPC provider (like
+// did-eth-resolver)
 pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
 
 #[derive(FromArgs)]
@@ -33,10 +37,6 @@ struct DidEthGatewayApp {
     )]
     provider: String,
 }
-// TODO:
-// Handle different contract addresses
-// through an environment variable
-// or CLI Flag
 
 /// Entrypoint for the DID:Ethr Gateway
 pub async fn run() -> Result<()> {
