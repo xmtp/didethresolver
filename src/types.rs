@@ -66,7 +66,7 @@ impl DidDocument {
     }
 }
 
-/// TODO
+/// Represents a service associated with a DID.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Service {
     pub id: DidUrl,
@@ -78,7 +78,7 @@ pub struct Service {
     pub recipient_keys: String,
 }
 
-/// TODO
+/// Describes a method for verifying a DID.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct VerificationMethod {
     pub id: DidUrl,
