@@ -30,22 +30,12 @@ jobs:
         uses: actions/configure-pages@v2
       - uses: actions/setup-python@v2
 
-      - name: "Cache"
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ./target/${{ matrix.target }}
-          key: ${{ matrix.target }}-${{ hashFiles('**/Cargo.toml','**/Cargo.lock') }}
-
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
-          target: ${{ matrix.target }}
 
       - name: Run tests
         run: |
