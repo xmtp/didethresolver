@@ -95,21 +95,38 @@ impl Resolver {
         base_document.now(now);
 
         for (event, meta) in history {
-            if version_id < meta.block_number {
-                version_id = meta.block_number;
+            let LogMeta {
+                block_number,
+                log_index,
+                ..
+            } = meta;
+
+            if version_id < block_number {
+                version_id = block_number;
             }
 
-            match event {
+            let res = match event {
                 DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
-                    base_document.delegate_event(delegate_changed)?;
+                    base_document.delegate_event(delegate_changed)
                 }
                 DIDRegistryEvents::DidattributeChangedFilter(attribute_event) => {
-                    base_document.attribute_event(attribute_event)?;
+                    base_document.attribute_event(attribute_event)
                 }
                 DIDRegistryEvents::DidownerChangedFilter(owner_changed) => {
-                    base_document.owner_event(owner_changed)?;
+                    base_document.owner_event(owner_changed)
                 }
-            }
+            };
+
+            // if a did was set with the wrong format, for instance set-attribute was called with
+            // raw bytes instead of hex-encoded bytes, we don't want to cancel resolution of the
+            // rest of the DID
+            //
+            // TODO: Send this info as an extra json field to the caller apart from the DID Document
+            if let Err(e) = res {
+                log::error!(
+                        "Error while resolving for {public_key} at event block={block_number}, log index={log_index}, incorrect format?: {e}",
+                    );
+            };
         }
         Ok(base_document.build())
     }
