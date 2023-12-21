@@ -43,8 +43,8 @@ pub async fn run() -> Result<()> {
     crate::util::init_logging();
     let opts: DidEthGatewayApp = argh::from_env();
 
-    let server = Server::builder().build(opts.address).await.unwrap();
-    let addr = server.local_addr().unwrap();
+    let server = Server::builder().build(opts.address).await?;
+    let addr = server.local_addr()?;
     let registry_address = Address::from_str(DID_ETH_REGISTRY)?;
     let resolver = Resolver::new(opts.provider, registry_address).await?;
     let handle = server.start(rpc::DidRegistryMethods::new(resolver).into_rpc());
