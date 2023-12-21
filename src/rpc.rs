@@ -1,3 +1,5 @@
+//! JSON-RPC Interface and Implementation
+
 mod api;
 mod methods;
 

@@ -10,10 +10,12 @@ use thiserror::Error;
 use super::api::*;
 use crate::{resolver::Resolver, types::DidDocument};
 
+/// Read-only methods for the DID Registry JSON-RPC
 pub struct DidRegistryMethods {
     resolver: Resolver,
 }
 
+/// The implementation of the JSON-RPC trait, [`DidRegistryServer`].
 impl DidRegistryMethods {
     pub fn new(resolver: Resolver) -> Self {
         Self { resolver }
@@ -35,8 +37,10 @@ impl DidRegistryServer for DidRegistryMethods {
     }
 }
 
+/// Error types for DID Registry JSON-RPC
 #[derive(Debug, Error)]
 enum RpcError {
+    /// A public key parameter was invalid
     #[error("Invalid public key format")]
     InvalidPublicKey(#[from] rustc_hex::FromHexError),
 }
@@ -51,6 +55,7 @@ impl From<RpcError> for ErrorObjectOwned {
     }
 }
 
+/// Convenience function to convert an anyhow::Error into an ErrorObjectOwned.
 fn into_error_object(error: anyhow::Error) -> ErrorObjectOwned {
     ErrorObjectOwned::owned(-31000, error.to_string(), None::<()>)
 }

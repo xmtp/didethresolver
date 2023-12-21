@@ -16,6 +16,7 @@ pub struct DidUrl {
     method_and_id: MethodAndId,
 }
 
+/// The `method` and `id` parts of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL, returned by [`parse_ethr_did`]
 #[derive(Debug, Clone, PartialEq, Eq, SmartDefault)]
 pub struct MethodAndId {
     pub method: Method,
@@ -24,12 +25,15 @@ pub struct MethodAndId {
 // TODO: Could read a map of ChainId -> Provider from a configuration file or environment variable
 // (not in didurl parser though)
 
+/// The `id` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Id {
     pub chain: ChainId,
     pub public_key: AddressOrHexKey,
 }
 
+/// The `public_key` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) Url.
+/// A did:ethr URL may contain either a [`AddressOrHexKey::Address`] or [`AddressOrHexKey::HexKey`].
 #[derive(Debug, Clone, PartialEq, Eq, SmartDefault)]
 pub enum AddressOrHexKey {
     Address(Address),

@@ -20,6 +20,7 @@ pub use crate::{
 // in order to support multiple chains, we may need to support multiple providers via RPC
 // so it could be worth defining a config file that maps chainId to RPC provider (like
 // did-eth-resolver)
+/// The address of the DID Registry contract on the Ethereum Sepolia Testnet
 pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
 
 #[derive(FromArgs)]
@@ -38,7 +39,7 @@ struct DidEthGatewayApp {
     provider: String,
 }
 
-/// Entrypoint for the DID:Ethr Gateway
+/// Entrypoint for the did:ethr Gateway
 pub async fn run() -> Result<()> {
     crate::util::init_logging();
     let opts: DidEthGatewayApp = argh::from_env();

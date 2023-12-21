@@ -17,6 +17,7 @@ use crate::types::DidDocument;
 
 type ResolverSigner = SignerMiddleware<Provider<Ws>, LocalWallet>;
 
+/// A resolver for did:ethr that follows the steps outlined in the [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#read-resolve) in order to resolve a did:ethr identifier.
 pub struct Resolver {
     signer: Arc<ResolverSigner>,
     registry: DIDRegistry<ResolverSigner>,
