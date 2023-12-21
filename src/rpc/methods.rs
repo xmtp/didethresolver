@@ -29,6 +29,7 @@ impl DidRegistryServer for DidRegistryMethods {
             .resolve_did(H160::from_str(&public_key).unwrap())
             .await;
 
+        // TODO: Enumerate and map errors to meaningful JSON-RPC errors
         match result {
             Ok(doc) => Ok(doc),
             Err(e) => {

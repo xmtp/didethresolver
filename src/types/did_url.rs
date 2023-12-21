@@ -41,8 +41,8 @@ pub enum AddressOrHexKey {
 impl ToString for AddressOrHexKey {
     fn to_string(&self) -> String {
         match self {
-            AddressOrHexKey::Address(addr) => hex::encode(addr.as_bytes()),
-            AddressOrHexKey::HexKey(key) => hex::encode(key),
+            AddressOrHexKey::Address(addr) => format!("0x{}", hex::encode(addr.as_bytes())),
+            AddressOrHexKey::HexKey(key) => format!("0x{}", hex::encode(key)),
         }
     }
 }
@@ -160,8 +160,6 @@ impl DidUrl {
     /// use didethresolver::types::{ChainId, DidUrl};
     /// let did_url = DidUrl::parse("did:ethr:0x01:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// assert_eq!(did_url.chain_id(), &ChainId::Mainnet);
-    /// ```
-    ///
     /// ```
     ///
     pub fn chain_id(&self) -> &ChainId {
