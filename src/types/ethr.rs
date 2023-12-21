@@ -1,4 +1,4 @@
-//! Ethereum DID Method implementation according to https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md
+//! Ethereum DID Method implementation according to [specification](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
 //! This implementation offers [`EthrBuilder`] which allows dynamically building a DID document
 //! from the events emitted by the [`DIDRegistry`](crate::resolver::DIDRegistry).
 //!
@@ -70,7 +70,7 @@ impl Default for EthrBuilder {
     }
 }
 
-/// Builder to dynamically build a DID document from the events emitted by the [`DIDRegistry`](crate::resolver::DIDRegistry).
+/// Builder to dynamically build a DID document from the events emitted by the [`DIDRegistry`](crate::resolver::did_registry::DIDRegistry).
 impl EthrBuilder {
     /// Set the current time this document is valid for.
     pub fn now(&mut self, now: U256) {
