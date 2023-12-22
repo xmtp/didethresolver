@@ -4,9 +4,9 @@ pub mod types;
 mod util;
 
 use std::str::FromStr;
+use serde::Deserialize;
 
 use anyhow::Result;
-use argh::FromArgs;
 use ethers::types::Address;
 use jsonrpsee::server::Server;
 
@@ -23,26 +23,31 @@ pub use crate::{
 /// The address of the DID Registry contract on the Ethereum Sepolia Testnet
 pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
 
-#[derive(FromArgs)]
+#[derive(Deserialize)]
 /// DID Ethereum Resolver XMTP Gateway
 struct DidEthGatewayApp {
     /// the address to start the server
-    #[argh(option, short = 'a', default = "String::from(\"127.0.0.1:9944\")")]
+    #[serde(default= "default_address")]
     address: String,
 
     /// ethereum RPC Provider
-    #[argh(
-        option,
-        short = 'p',
-        default = "String::from(\"wss://eth.llamarpc.com\")"
-    )]
+    #[serde(default= "default_provider")]
     provider: String,
+}
+
+fn default_address() -> String {
+    "127.0.0.1:9944".to_string()
+}
+
+fn default_provider() -> String {
+    "http://127.0.0.1:8545".to_string()
 }
 
 /// Entrypoint for the did:ethr Gateway
 pub async fn run() -> Result<()> {
     crate::util::init_logging();
-    let opts: DidEthGatewayApp = argh::from_env();
+    dotenvy::dotenv()?;
+    let opts: DidEthGatewayApp = envy::from_env()?;
 
     let server = Server::builder().build(opts.address).await?;
     let addr = server.local_addr()?;
