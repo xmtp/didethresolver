@@ -16,6 +16,9 @@ pub use crate::{
     rpc::DidRegistryServer,
 };
 
+const DEFAULT_ADDRESS: &str = "127.0.0.1:9944";
+const DEFAULT_PROVIDER: &str = "http://127.0.0.1:8545";
+
 // TODO: Get registry address from environment variable, or configuration file
 // in order to support multiple chains, we may need to support multiple providers via RPC
 // so it could be worth defining a config file that maps chainId to RPC provider (like
@@ -36,11 +39,11 @@ struct DidEthGatewayApp {
 }
 
 fn default_address() -> String {
-    "127.0.0.1:9944".to_string()
+    DEFAULT_ADDRESS.to_string()
 }
 
 fn default_provider() -> String {
-    "http://127.0.0.1:8545".to_string()
+    DEFAULT_PROVIDER.to_string()
 }
 
 /// Entrypoint for the did:ethr Gateway
@@ -48,7 +51,7 @@ pub async fn run() -> Result<()> {
     crate::util::init_logging();
     dotenvy::dotenv()?;
     let opts: DidEthGatewayApp = envy::from_env()?;
-
+    
     let server = Server::builder().build(opts.address).await?;
     let addr = server.local_addr()?;
     let registry_address = Address::from_str(DID_ETH_REGISTRY)?;
@@ -58,4 +61,15 @@ pub async fn run() -> Result<()> {
     log::info!("Server Started at {addr}");
     handle.stopped().await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn internal() {
+        assert_eq!(DEFAULT_ADDRESS, default_address());
+        assert_eq!(DEFAULT_PROVIDER, default_provider());
+    }
 }
