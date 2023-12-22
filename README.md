@@ -4,6 +4,11 @@
 
 This resolver service implements a DID registry resolver to resolve decentralized identifiers for the XMTP client sdk.
 
+## Quick Start (Development)
+
+- [READ THE DOCS](https://xmtp.github.io/didethresolver)
+- [CONTRIBUTING](CONTRIBUTING.md)
+
 ## Introduction to DID Specification
 
 The Decentralized Identifiers (DIDs) v1.0 specification, as outlined by W3C, describes a system for creating verifiable, decentralized digital identities. DIDs are unique identifiers that can refer to any subject, such as a person or organization, and are controlled by their creator rather than a centralized authority. This approach aims to decouple identity management from centralized registries and certificate authorities.
