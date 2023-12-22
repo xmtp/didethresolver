@@ -11,8 +11,7 @@ use ethers::{
 };
 use integration_util::{validate_document, with_client};
 
-//TODO: Add tests for: Errors, formats, entire document asserts, different padding methods(0s and
-//spaces)
+//TODO: Add tests for: Errors, formats, entire document asserts, different padding methods(0s and spaces)
 
 #[tokio::test]
 pub async fn test_attributes() -> Result<()> {

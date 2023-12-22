@@ -55,7 +55,7 @@ where
 {
     init_logging();
 
-    let anvil = Anvil::new().spawn();
+    let anvil = Anvil::new().args(vec!["--base-fee", "100"]).spawn();
     log::debug!("Anvil spawned at {}", anvil.ws_endpoint());
     let registry_address = deploy_to_anvil(&anvil).await;
     log::debug!("Contract deployed at {}", registry_address);
@@ -113,6 +113,7 @@ async fn deploy_to_anvil(anvil: &AnvilInstance) -> Address {
 
     let registry = DIDRegistry::deploy(client.clone(), ())
         .unwrap()
+        .gas_price(100)
         .send()
         .await
         .unwrap();
