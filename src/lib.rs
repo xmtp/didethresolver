@@ -84,8 +84,8 @@ pub mod rpc;
 pub mod types;
 mod util;
 
-use std::str::FromStr;
 use serde::Deserialize;
+use std::str::FromStr;
 
 use anyhow::Result;
 use ethers::types::Address;
@@ -111,11 +111,11 @@ pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
 /// DID Ethereum Resolver XMTP Gateway
 struct DidEthGatewayApp {
     /// the address to start the server
-    #[serde(default= "default_address")]
+    #[serde(default = "default_address")]
     address: String,
 
     /// ethereum RPC Provider
-    #[serde(default= "default_provider")]
+    #[serde(default = "default_provider")]
     provider: String,
 }
 
@@ -132,7 +132,7 @@ pub async fn run() -> Result<()> {
     crate::util::init_logging();
     dotenvy::dotenv()?;
     let opts: DidEthGatewayApp = envy::from_env()?;
-    
+
     let server = Server::builder().build(opts.address).await?;
     let addr = server.local_addr()?;
     let registry_address = Address::from_str(DID_ETH_REGISTRY)?;
