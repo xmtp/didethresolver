@@ -96,7 +96,7 @@ impl EthrBuilder {
         Ok(())
     }
 
-    /// Add an `did:ethr` attribute to the DID Document.
+    /// Add a delegate to the DID Document.
     /// Delegate keys are Ethereum addresses that can either be general signing keys or optionally also perform authentication.
     /// They are also verifiable from Solidity (on-chain).
     /// When a delegate is added or revoked, a DIDDelegateChanged event is published that MUST be used to update the DID document.
@@ -125,7 +125,7 @@ impl EthrBuilder {
         Ok(())
     }
 
-    /// A general attribute which indicates external services or keys are associated with the DID.
+    /// Add a general attribute which indicates external services or keys associated with the DID.
     /// The name of the attribute added to ERC1056 should follow this format: `did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc)/(hex|base64|base58)`
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
@@ -173,7 +173,8 @@ impl EthrBuilder {
         Ok(())
     }
 
-    ///  The event data MUST be used to update the #controller entry in the verificationMethod array.
+    /// Add an owner to the document
+    ///  The event data is used to update the #controller entry in the verificationMethod array.
     ///  When resolving DIDs with publicKey identifiers, if the controller (owner) address is different from the corresponding address of the publicKey, then the #controllerKey entry in the verificationMethod array MUST be omitted.
     ///
     ///  referecne: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#controller-changes-didownerchanged)
