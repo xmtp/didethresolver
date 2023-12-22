@@ -134,17 +134,6 @@ pub enum VerificationMethodProperties {
     },
 }
 
-impl VerificationMethod {
-    pub fn new(id: DidUrl, controller: DidUrl, verification_type: KeyType) -> Self {
-        Self {
-            id,
-            controller,
-            verification_type,
-            verification_properties: None,
-        }
-    }
-}
-
 /// Represents different types of services associated with a DID.
 /// Currently, only [`ServiceType::Messaging`] is directly supported
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -154,15 +143,6 @@ pub enum ServiceType {
     Messaging,
     /// Other Service type, not directly supported
     Other(String),
-}
-
-impl<'a> From<&'a str> for ServiceType {
-    fn from(s: &'a str) -> ServiceType {
-        match s {
-            "MessagingService" => Self::Messaging,
-            other => Self::Other(other.into()),
-        }
-    }
 }
 
 /// Various cryptographic key types defined in the [DID Specification](https://www.w3.org/TR/did-spec-registries/#verification-method-types)
@@ -319,5 +299,21 @@ mod test {
             }
         );
         assert_eq!(serde_json::to_value(doc).unwrap(), sample_did);
+    }
+
+    #[test]
+    fn test_keytype_to_str() {
+        assert_eq!(String::from(KeyType::JsonWebKey2020), "jwk");
+        assert_eq!(String::from(KeyType::Ed25519VerificationKey2020), "Ed25519");
+        assert_eq!(
+            String::from(KeyType::EcdsaSecp256k1RecoveryMethod2020),
+            "Secp256k1"
+        );
+        assert_eq!(
+            String::from(KeyType::EcdsaSecp256k1VerificationKey2019),
+            "Secp256k1"
+        );
+        assert_eq!(String::from(KeyType::RsaVerificationKey2018), "RSA");
+        assert_eq!(String::from(KeyType::X25519KeyAgreementKey2019), "X25519");
     }
 }
