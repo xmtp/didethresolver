@@ -3,6 +3,8 @@ FROM ghcr.io/xmtp/rust:latest
 ARG PROJECT=didethresolver
 WORKDIR /workspaces/${PROJECT}
 
+RUN sudo apt update && sudo apt install -y pkg-config openssl libssl-dev
+
 USER xmtp
 ENV USER=xmtp
 ENV PATH=/home/${USER}/.cargo/bin:$PATH
