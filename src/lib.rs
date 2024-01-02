@@ -86,6 +86,7 @@ mod util;
 
 use serde::Deserialize;
 use std::str::FromStr;
+use std::process;
 
 use anyhow::Result;
 use ethers::types::Address;
@@ -130,13 +131,31 @@ fn default_provider() -> String {
 /// Entrypoint for the did:ethr Gateway
 pub async fn run() -> Result<()> {
     crate::util::init_logging();
-    dotenvy::dotenv()?;
-    let opts: DidEthGatewayApp = envy::from_env()?;
+    match dotenvy::dotenv() {
+        Ok(path) => {
+            // .env file successfully loaded.
+            log::debug!("Env file {} was loaded successfully", path.display());
+        }
+        Err(err) => {
+            // Error handling for the case where dotenv() fails
+            log::info!("Unable to load env file(s) : {err}");
+        }
+    }
+    let opts  = envy::from_env::<DidEthGatewayApp>()?;
 
     let server = Server::builder().build(opts.address).await?;
     let addr = server.local_addr()?;
     let registry_address = Address::from_str(DID_ETH_REGISTRY)?;
-    let resolver = Resolver::new(opts.provider, registry_address).await?;
+    let provider = opts.provider.clone();
+    let resolver: Resolver = match Resolver::new(opts.provider, registry_address).await {
+        Ok(resolver) => {
+            resolver
+        }
+        Err(err) => {
+            log::error!("Unable to create a resolver for provider {} and registry address {} : {})", provider, registry_address, err);
+            process::exit(-1);
+        }
+    };
     let handle = server.start(rpc::DidRegistryMethods::new(resolver).into_rpc());
 
     log::info!("Server Started at {addr}");
