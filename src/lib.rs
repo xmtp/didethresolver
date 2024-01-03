@@ -85,8 +85,8 @@ pub mod types;
 mod util;
 
 use serde::Deserialize;
-use std::str::FromStr;
 use std::process;
+use std::str::FromStr;
 
 use anyhow::Result;
 use ethers::types::Address;
@@ -141,18 +141,21 @@ pub async fn run() -> Result<()> {
             log::info!("Unable to load env file(s) : {err}");
         }
     }
-    let opts  = envy::from_env::<DidEthGatewayApp>()?;
+    let opts = envy::from_env::<DidEthGatewayApp>()?;
 
     let server = Server::builder().build(opts.address).await?;
     let addr = server.local_addr()?;
     let registry_address = Address::from_str(DID_ETH_REGISTRY)?;
     let provider = opts.provider.clone();
     let resolver: Resolver = match Resolver::new(opts.provider, registry_address).await {
-        Ok(resolver) => {
-            resolver
-        }
+        Ok(resolver) => resolver,
         Err(err) => {
-            log::error!("Unable to create a resolver for provider {} and registry address {} : {})", provider, registry_address, err);
+            log::error!(
+                "Unable to create a resolver for provider {} and registry address {} : {})",
+                provider,
+                registry_address,
+                err
+            );
             process::exit(-1);
         }
     };
