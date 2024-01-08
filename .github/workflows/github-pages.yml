@@ -37,6 +37,9 @@ jobs:
           profile: minimal
           override: true
 
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Run tests
         run: |
           cargo test
