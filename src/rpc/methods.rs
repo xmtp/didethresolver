@@ -3,12 +3,12 @@
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use ethers::types::H160;
+use ethers::types::{H160, U64};
 use jsonrpsee::types::ErrorObjectOwned;
 use thiserror::Error;
 
 use super::api::*;
-use crate::{resolver::Resolver, types::DidDocument};
+use crate::{resolver::Resolver, types::DidResolutionResult};
 
 /// Read-only methods for the DID Registry JSON-RPC
 pub struct DidRegistryMethods {
@@ -24,16 +24,24 @@ impl DidRegistryMethods {
 
 #[async_trait]
 impl DidRegistryServer for DidRegistryMethods {
-    async fn resolve_did(&self, public_key: String) -> Result<DidDocument, ErrorObjectOwned> {
+    async fn resolve_did(&self, public_key: String, version_id: Option<String>) -> Result<DidResolutionResult, ErrorObjectOwned> {
         log::debug!("did_resolveDid called");
 
-        let document = self
+        // parse the version_id
+        let parsed_version_id = match version_id {
+            Some(str) => Some(U64::from(u64::from_str(&str).unwrap())),
+            None => None,
+        };
+
+        let resolution_result = self
             .resolver
-            .resolve_did(H160::from_str(&public_key).map_err(RpcError::from)?)
+            .resolve_did(
+                H160::from_str(&public_key).map_err(RpcError::from)?, 
+                parsed_version_id)
             .await
             .map_err(into_error_object)?;
 
-        Ok(document)
+        Ok(resolution_result)
     }
 }
 

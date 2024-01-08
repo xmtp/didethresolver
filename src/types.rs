@@ -220,6 +220,36 @@ pub struct PublicKey {
     pub encoding: KeyEncoding,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct DidDocumentMetadata {
+    #[serde(default, rename="deactivated")]
+    pub deactivated: bool,
+    #[serde(default, rename="versionId")]
+    pub version_id: u64,
+    #[serde(default, rename="updated", skip_serializing_if = "Option::is_none")]
+    pub updated: Option<String>,
+    #[serde(default, rename="nextVersionId", skip_serializing_if = "Option::is_none")]
+    pub next_version_id: Option<u64>,
+    #[serde(default, rename="nextUpdate", skip_serializing_if = "Option::is_none")]
+    pub next_update: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct DidResolutionMetadata {
+    #[serde(default, rename="contentType")]
+    pub content_type: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct DidResolutionResult {
+    #[serde(default, rename="didDocumentMetadata", skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<DidDocumentMetadata>,
+    #[serde(rename="didResolutionMetadata", skip_serializing_if = "Option::is_none")]
+    pub resolution_metadata: Option<DidResolutionMetadata>,
+    #[serde(rename="didDocument")]
+    pub document: DidDocument,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
