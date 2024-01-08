@@ -24,7 +24,11 @@ impl DidRegistryMethods {
 
 #[async_trait]
 impl DidRegistryServer for DidRegistryMethods {
-    async fn resolve_did(&self, public_key: String, version_id: Option<String>) -> Result<DidResolutionResult, ErrorObjectOwned> {
+    async fn resolve_did(
+        &self,
+        public_key: String,
+        version_id: Option<String>,
+    ) -> Result<DidResolutionResult, ErrorObjectOwned> {
         log::debug!("did_resolveDid called");
 
         // parse the version_id
@@ -36,8 +40,9 @@ impl DidRegistryServer for DidRegistryMethods {
         let resolution_result = self
             .resolver
             .resolve_did(
-                H160::from_str(&public_key).map_err(RpcError::from)?, 
-                parsed_version_id)
+                H160::from_str(&public_key).map_err(RpcError::from)?,
+                parsed_version_id,
+            )
             .await
             .map_err(into_error_object)?;
 

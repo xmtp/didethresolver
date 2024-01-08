@@ -14,7 +14,9 @@ use ethers::{
 use rand::{rngs::StdRng, SeedableRng};
 
 use self::did_registry::{DIDRegistry, DIDRegistryEvents};
-use crate::types::{DidResolutionResult, DidDocument, DidResolutionMetadata, DidDocumentMetadata, EthrBuilder};
+use crate::types::{
+    DidDocument, DidDocumentMetadata, DidResolutionMetadata, DidResolutionResult, EthrBuilder,
+};
 
 type ResolverSigner = SignerMiddleware<Provider<Ws>, LocalWallet>;
 
@@ -38,9 +40,15 @@ impl Resolver {
         Ok(Self { signer, registry })
     }
 
-    pub async fn resolve_did(&self, public_key: H160, version_id:Option<U64>) -> Result<DidResolutionResult> {
+    pub async fn resolve_did(
+        &self,
+        public_key: H160,
+        version_id: Option<U64>,
+    ) -> Result<DidResolutionResult> {
         let history = self.changelog(public_key).await?;
-        Ok(self.wrap_did_resolution(public_key, version_id, history).await?)
+        Ok(self
+            .wrap_did_resolution(public_key, version_id, history)
+            .await?)
     }
 
     async fn changelog(&self, public_key: H160) -> Result<Vec<(DIDRegistryEvents, LogMeta)>> {
@@ -80,8 +88,14 @@ impl Resolver {
         Ok(history)
     }
 
-
-    fn dispatch_event(&self,  doc: &mut EthrBuilder, public_key: H160, event: DIDRegistryEvents, meta: LogMeta, deactivated: &mut bool) {
+    fn dispatch_event(
+        &self,
+        doc: &mut EthrBuilder,
+        public_key: H160,
+        event: DIDRegistryEvents,
+        meta: LogMeta,
+        deactivated: &mut bool,
+    ) {
         let res = match event {
             DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
                 doc.delegate_event(delegate_changed)
@@ -113,7 +127,6 @@ impl Resolver {
         };
     }
 
-
     async fn wrap_did_resolution(
         &self,
         public_key: H160,
@@ -130,19 +143,23 @@ impl Resolver {
         let mut current_version_id = U64::zero();
 
         base_document.now(now);
-        let mut last_updated_did_version_id : Option<U64> = {None};
+        let mut last_updated_did_version_id: Option<U64> = { None };
         let mut deactivated = false;
 
         for (event, meta) in history {
-            let LogMeta {
-                block_number,
-                ..
-            } = meta;
+            let LogMeta { block_number, .. } = meta;
 
             if version_id.unwrap_or_default() > U64::zero() {
                 if meta.block_number <= version_id.unwrap_or_default() {
                     // 1. delegate events
-                    Resolver::dispatch_event(&self, &mut base_document, public_key, event, meta, &mut deactivated);
+                    Resolver::dispatch_event(
+                        &self,
+                        &mut base_document,
+                        public_key,
+                        event,
+                        meta,
+                        &mut deactivated,
+                    );
                     // 2. set latest version
                     if current_version_id < block_number {
                         current_version_id = block_number;
@@ -154,7 +171,14 @@ impl Resolver {
                 }
             } else {
                 // 1. delegate events
-                Resolver::dispatch_event(&self, &mut base_document, public_key, event, meta, &mut deactivated);
+                Resolver::dispatch_event(
+                    &self,
+                    &mut base_document,
+                    public_key,
+                    event,
+                    meta,
+                    &mut deactivated,
+                );
                 // 2. set latest version
                 if current_version_id < block_number {
                     current_version_id = block_number;
@@ -166,18 +190,23 @@ impl Resolver {
         let current_version_timestamp = match self.signer.get_block(current_version_id).await? {
             Some(block) => {
                 if current_version_id != U64::zero() {
-                    Some::<String>(block.time().unwrap_or_default().format("%Y-%m-%dT%H:%M:%SZ").to_string())
+                    Some::<String>(
+                        block
+                            .time()
+                            .unwrap_or_default()
+                            .format("%Y-%m-%dT%H:%M:%SZ")
+                            .to_string(),
+                    )
                 } else {
                     None::<String>
                 }
-            },
-            None => None::<String>
+            }
+            None => None::<String>,
         };
 
-
-        let resolution_result = DidResolutionResult{
+        let resolution_result = DidResolutionResult {
             document: base_document.build(),
-            metadata: Some(DidDocumentMetadata{
+            metadata: Some(DidDocumentMetadata {
                 deactivated: deactivated,
                 version_id: current_version_id.as_u64(),
                 updated: current_version_timestamp,
@@ -186,18 +215,20 @@ impl Resolver {
                     None => None::<u64>,
                 },
                 next_update: match last_updated_did_version_id {
-                        Some(ver)=> {
-                            match self.signer.get_block(ver).await? {
-                                Some(block) => {
-                                    Some::<String>(block.time().unwrap_or_default().format("%Y-%m-%dT%H:%M:%SZ").to_string())
-                                },
-                                None => None::<String>,
-                            }
-                        },
+                    Some(ver) => match self.signer.get_block(ver).await? {
+                        Some(block) => Some::<String>(
+                            block
+                                .time()
+                                .unwrap_or_default()
+                                .format("%Y-%m-%dT%H:%M:%SZ")
+                                .to_string(),
+                        ),
                         None => None::<String>,
+                    },
+                    None => None::<String>,
                 },
             }),
-            resolution_metadata: Some(DidResolutionMetadata{
+            resolution_metadata: Some(DidResolutionMetadata {
                 content_type: "application/did+ld+json".to_string(),
             }),
         };
