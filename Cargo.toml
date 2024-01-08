@@ -33,6 +33,7 @@ rustc-hex= "2.1"
 peg = "0.8"
 dotenvy = "0.15.7"
 envy = "0.4.2"
+chrono = "0.4.27"
 
 [dev-dependencies]
 jsonrpsee = { version = "0.21", features = ["macros", "server", "client"] }
