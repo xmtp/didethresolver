@@ -32,10 +32,7 @@ impl DidRegistryServer for DidRegistryMethods {
         log::debug!("did_resolveDid called");
 
         // parse the version_id
-        let parsed_version_id = match version_id {
-            Some(str) => Some(U64::from(u64::from_str(&str).unwrap())),
-            None => None,
-        };
+        let parsed_version_id = version_id.map(|str| U64::from(u64::from_str(&str).unwrap()));
 
         let resolution_result = self
             .resolver

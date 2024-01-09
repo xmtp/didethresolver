@@ -69,7 +69,7 @@ peg::parser! {
 
         rule ethereum_address() -> AddressOrHexKey
             = "0" i("x") digits:$(hex_digit()*<40>) {
-                AddressOrHexKey::Address(Address::from_slice(&hex::decode(&digits).unwrap()))
+                AddressOrHexKey::Address(Address::from_slice(&hex::decode(digits).unwrap()))
             }
 
         rule public_key_hex() -> AddressOrHexKey

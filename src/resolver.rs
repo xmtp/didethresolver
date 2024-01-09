@@ -46,9 +46,8 @@ impl Resolver {
         version_id: Option<U64>,
     ) -> Result<DidResolutionResult> {
         let history = self.changelog(public_key).await?;
-        Ok(self
-            .wrap_did_resolution(public_key, version_id, history)
-            .await?)
+        self.wrap_did_resolution(public_key, version_id, history)
+            .await
     }
 
     async fn changelog(&self, public_key: H160) -> Result<Vec<(DIDRegistryEvents, LogMeta)>> {
@@ -153,7 +152,7 @@ impl Resolver {
                 if meta.block_number <= version_id.unwrap_or_default() {
                     // 1. delegate events
                     Resolver::dispatch_event(
-                        &self,
+                        self,
                         &mut base_document,
                         public_key,
                         event,
@@ -172,7 +171,7 @@ impl Resolver {
             } else {
                 // 1. delegate events
                 Resolver::dispatch_event(
-                    &self,
+                    self,
                     &mut base_document,
                     public_key,
                     event,
@@ -207,24 +206,18 @@ impl Resolver {
         let resolution_result = DidResolutionResult {
             document: base_document.build(),
             metadata: Some(DidDocumentMetadata {
-                deactivated: deactivated,
+                deactivated,
                 version_id: current_version_id.as_u64(),
                 updated: current_version_timestamp,
-                next_version_id: match last_updated_did_version_id {
-                    Some(ver) => Some::<u64>(ver.as_u64()),
-                    None => None::<u64>,
-                },
+                next_version_id: last_updated_did_version_id.map(|ver| ver.as_u64()),
                 next_update: match last_updated_did_version_id {
-                    Some(ver) => match self.signer.get_block(ver).await? {
-                        Some(block) => Some::<String>(
-                            block
-                                .time()
-                                .unwrap_or_default()
-                                .format("%Y-%m-%dT%H:%M:%SZ")
-                                .to_string(),
-                        ),
-                        None => None::<String>,
-                    },
+                    Some(ver) => self.signer.get_block(ver).await?.map(|block| {
+                        block
+                            .time()
+                            .unwrap_or_default()
+                            .format("%Y-%m-%dT%H:%M:%SZ")
+                            .to_string()
+                    }),
                     None => None::<String>,
                 },
             }),
