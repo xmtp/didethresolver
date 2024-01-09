@@ -15,7 +15,7 @@ COPY --from=ghcr.io/xmtp/foundry:latest /usr/local/bin/anvil /usr/local/bin/anvi
 COPY --chown=xmtp:xmtp . .
 
 RUN cargo fmt --check
-RUN cargo clippy --all-features --no-deps
+RUN cargo clippy --all-features --no-deps -- -D warnings
 RUN cargo test 
 
 CMD cargo run
