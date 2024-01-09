@@ -91,7 +91,7 @@ impl EthrBuilder {
     /// Set the controller of the document
     pub fn controller(&mut self, controller: &Address) -> Result<()> {
         let mut did = self.id.clone();
-        did.set_path(&format!("ethr:0x{}", hex::encode(&controller)))?;
+        did.set_path(&format!("ethr:0x{}", hex::encode(controller)))?;
         self.controller = Some(did);
         Ok(())
     }
@@ -108,7 +108,7 @@ impl EthrBuilder {
         }
 
         let delegate_type = String::from_utf8_lossy(&event.delegate_type);
-        let key_purpose = types::parse_delegate(&delegate_type.to_string());
+        let key_purpose = types::parse_delegate(delegate_type.as_ref());
         match key_purpose {
             Ok(KeyPurpose::SignatureAuthentication) => {
                 self.delegate(&event.delegate, KeyPurpose::SignatureAuthentication);

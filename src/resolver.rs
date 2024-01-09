@@ -39,7 +39,7 @@ impl Resolver {
 
     pub async fn resolve_did(&self, public_key: H160) -> Result<DidDocument> {
         let history = self.changelog(public_key).await?;
-        Ok(self.wrap_did_document(public_key, history).await?)
+        self.wrap_did_document(public_key, history).await
     }
 
     async fn changelog(&self, public_key: H160) -> Result<Vec<(DIDRegistryEvents, LogMeta)>> {
