@@ -85,10 +85,9 @@ pub mod types;
 mod util;
 
 use serde::Deserialize;
-use std::process;
 use std::str::FromStr;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use ethers::types::Address;
 use jsonrpsee::server::Server;
 
@@ -147,18 +146,13 @@ pub async fn run() -> Result<()> {
     let addr = server.local_addr()?;
     let registry_address = Address::from_str(DID_ETH_REGISTRY)?;
     let provider = opts.provider.clone();
-    let resolver: Resolver = match Resolver::new(opts.provider, registry_address).await {
-        Ok(resolver) => resolver,
-        Err(err) => {
-            log::error!(
-                "Unable to create a resolver for provider {} and registry address {} : {})",
-                provider,
-                registry_address,
-                err
-            );
-            process::exit(-1);
-        }
-    };
+    let resolver: Resolver = Resolver::new(opts.provider, registry_address)
+        .await
+        .context(format!(
+            "Unable to create a resolver for provider {} and registry address {}",
+            provider, registry_address,
+        ))?;
+
     let handle = server.start(rpc::DidRegistryMethods::new(resolver).into_rpc());
 
     log::info!("Server Started at {addr}");
