@@ -173,7 +173,7 @@ impl EthrBuilder {
         Ok(())
     }
 
-    /// Add an owner to the document
+    ///  Add an owner to the document
     ///  The event data is used to update the #controller entry in the verificationMethod array.
     ///  When resolving DIDs with publicKey identifiers, if the controller (owner) address is different from the corresponding address of the publicKey, then the #controllerKey entry in the verificationMethod array MUST be omitted.
     ///
@@ -645,5 +645,55 @@ mod tests {
                 .unwrap(),
             builder.authentication[0]
         );
+    }
+
+    #[test]
+    fn test_revoke_attributes() {
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let events = vec![
+            DiddelegateChangedFilter {
+                identity,
+                delegate_type: *b"veriKey                         ",
+                delegate: address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff"),
+                valid_to: U256::from(100),
+                previous_change: U256::zero(),
+            },
+            DiddelegateChangedFilter {
+                identity,
+                delegate_type: *b"sigAuth                         ",
+                delegate: address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff"),
+                valid_to: U256::from(50),
+                previous_change: U256::zero(),
+            },
+        ];
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::zero());
+        for event in &events {
+            builder.delegate_event(event.clone()).unwrap();
+        }
+
+        // both events are valid
+        assert_eq!(builder.verification_method.len(), 2);
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::from(75));
+        for event in &events {
+            builder.delegate_event(event.clone()).unwrap();
+        }
+        // only one event is valid
+        assert_eq!(builder.verification_method.len(), 1);
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::from(125));
+        for event in &events {
+            builder.delegate_event(event.clone()).unwrap();
+        }
+
+        // no events valid
+        assert_eq!(builder.verification_method.len(), 0);
     }
 }
