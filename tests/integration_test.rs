@@ -34,31 +34,10 @@ pub async fn test_attributes() -> Result<()> {
         did.send().await?.await?;
 
         let document = client.resolve_did(hex::encode(me)).await?;
-        validate_document(&document).await;
-
-        assert_eq!(
-            document.verification_method[0].id,
-            DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
-        );
-        assert_eq!(
-            document.verification_method[0].controller,
-            DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
-        );
-        assert_eq!(
-            document.verification_method[0].verification_type,
-            KeyType::EcdsaSecp256k1VerificationKey2019
-        );
-        assert_eq!(
-            document.verification_method[0].verification_properties,
-            Some(VerificationMethodProperties::PublicKeyHex {
-                public_key_hex:
-                    "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".to_string()
-            })
-        );
-
+        
         assert_eq!(
             document.verification_method[1].id,
-            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+            DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
         );
         assert_eq!(
             document.verification_method[1].controller,
@@ -66,10 +45,30 @@ pub async fn test_attributes() -> Result<()> {
         );
         assert_eq!(
             document.verification_method[1].verification_type,
-            KeyType::Ed25519VerificationKey2020
+            KeyType::EcdsaSecp256k1VerificationKey2019
         );
         assert_eq!(
             document.verification_method[1].verification_properties,
+            Some(VerificationMethodProperties::PublicKeyHex {
+                public_key_hex:
+                    "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".to_string()
+            })
+        );
+
+        assert_eq!(
+            document.verification_method[2].id,
+            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+        );
+        assert_eq!(
+            document.verification_method[2].controller,
+            DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
+        );
+        assert_eq!(
+            document.verification_method[2].verification_type,
+            KeyType::Ed25519VerificationKey2020
+        );
+        assert_eq!(
+            document.verification_method[2].verification_properties,
             Some(VerificationMethodProperties::PublicKeyBase64 {
                 public_key_base64: "MCowBQYDK2VuAyEAEYVXd3/7B4d0NxpSsA/tdVYdz5deYcR1U+ZkphdmEFI="
                     .to_string()
@@ -106,15 +105,15 @@ pub async fn test_delegate() -> Result<()> {
         validate_document(&document).await;
 
         assert_eq!(
-            document.verification_method[0].id,
+            document.verification_method[1].id,
             DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
         );
         assert_eq!(
-            document.verification_method[0].controller,
+            document.verification_method[1].controller,
             DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
         );
         assert_eq!(
-            document.verification_method[0].verification_properties,
+            document.verification_method[1].verification_properties,
             Some(VerificationMethodProperties::BlockchainAccountId {
                 blockchain_account_id: format!("0x{}", hex::encode(delegate.address()))
             })
@@ -142,6 +141,39 @@ pub async fn test_owner_changed() -> Result<()> {
                 DidUrl::parse(format!("did:ethr:0x{}", hex::encode(new_owner.address()))).unwrap()
             )
         );
+        Ok(())
+    })
+    .await
+}
+
+#[tokio::test]
+pub async fn test_attribute_revocation() -> Result<()> {
+    with_client(None, |client, registry, signer, _| async move {
+        let me = signer.address();
+        let did = registry.set_attribute(
+            me,
+            *b"did/pub/Secp256k1/veriKey/hex   ",
+            b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            U256::from(604_800),
+        );
+        did.send().await?.await?;
+
+        let did = registry.revoke_attribute(
+            me,
+            *b"did/pub/Secp256k1/veriKey/hex   ",
+            b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+        );
+        did.send().await?.await?;
+        
+        let document = client.resolve_did(hex::encode(me)).await?;
+        validate_document(&document).await;
+
+        assert_eq!(
+            document.verification_method[0].id,
+            DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
+        );
+        assert_eq!(document.verification_method.len(), 1);
+
         Ok(())
     })
     .await

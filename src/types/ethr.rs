@@ -8,7 +8,7 @@
 //! builder.public_key(&Address::from_str("0x872A62ABAfa278F0E0f02c1C5042D0614c3f38eb")).unwrap();
 //! let document = builder.build();
 
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use super::{
     Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey, Service,
@@ -23,9 +23,22 @@ use crate::{
 
 use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use ethers::types::{Address, U256};
+use ethers::types::{Address, Bytes, U256};
 use serde::{Deserialize, Serialize};
 use url::Url;
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+enum Key {
+    Attribute {
+        name: [u8; 32],
+        value: Bytes,
+        attribute: Attribute,
+    },
+    Delegate {
+        delegate: Address,
+        purpose: KeyPurpose,
+    },
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 /// DID Ethr Builder
@@ -44,6 +57,7 @@ pub struct EthrBuilder {
     delegate_count: usize,
     service_count: usize,
     now: U256,
+    keys: HashMap<Key, usize>,
 }
 
 impl Default for EthrBuilder {
@@ -66,6 +80,7 @@ impl Default for EthrBuilder {
             delegate_count: 0,
             service_count: 0,
             now: U256::zero(),
+            keys: Default::default(),
         }
     }
 }
@@ -103,24 +118,20 @@ impl EthrBuilder {
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
     pub fn delegate_event(&mut self, event: DiddelegateChangedFilter) -> Result<()> {
+        let delegate_type = String::from_utf8_lossy(&event.delegate_type);
+        let key_purpose = types::parse_delegate(&delegate_type.to_string())?;
+
+        let key = Key::Delegate {
+            delegate: event.delegate,
+            purpose: key_purpose,
+        };
+
         if event.valid_to < self.now {
+            self.keys.remove(&key);
             return Ok(());
         }
 
-        let delegate_type = String::from_utf8_lossy(&event.delegate_type);
-        let key_purpose = types::parse_delegate(&delegate_type.to_string());
-        match key_purpose {
-            Ok(KeyPurpose::SignatureAuthentication) => {
-                self.delegate(&event.delegate, KeyPurpose::SignatureAuthentication);
-            }
-            Ok(KeyPurpose::VerificationKey) => {
-                self.delegate(&event.delegate, KeyPurpose::VerificationKey);
-            }
-            _ => {
-                log::warn!("Unsupported or Unknown delegate type {delegate_type}");
-            }
-        };
-
+        self.keys.insert(key, self.delegate_count);
         self.delegate_count += 1;
         Ok(())
     }
@@ -142,8 +153,17 @@ impl EthrBuilder {
             attribute
         );
 
-        // invalid events still increment the counter
+        let key = Key::Attribute {
+            name: event.name,
+            value: event.value.clone(),
+            attribute: attribute.clone(),
+        };
+
+        // invalid events still increment the counter, unless in the case of revocation
         if event.valid_to < self.now {
+            if self.keys.remove(&key).is_some() {
+                return Ok(());
+            }
             match attribute {
                 Attribute::PublicKey(_) => {
                     self.delegate_count += 1;
@@ -151,25 +171,26 @@ impl EthrBuilder {
                 Attribute::Service(_) => {
                     self.service_count += 1;
                 }
-                _ => {}
+                Attribute::Other(_) => {
+                    log::trace!("Unhandled Attribute {name}:{}", event.value_string_lossy())
+                }
             };
-            return Ok(());
         }
 
         match attribute {
-            Attribute::PublicKey(key) => {
-                log::debug!("public key");
-                self.external_public_key(&event.value, key)?;
+            Attribute::PublicKey(_) => {
+                self.keys.insert(key, self.delegate_count);
                 self.delegate_count += 1;
             }
-            Attribute::Service(service) => {
-                self.service(&event.value, service)?;
+            Attribute::Service(_) => {
+                self.keys.insert(key, self.service_count);
                 self.service_count += 1;
             }
             Attribute::Other(_) => {
                 log::trace!("Unhandled Attribute {name}:{}", event.value_string_lossy())
             }
         };
+
         Ok(())
     }
 
@@ -190,10 +211,14 @@ impl EthrBuilder {
     /// The endpoint is the value of the attribute committed to the chain.
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
-    pub fn service<V: AsRef<[u8]>>(&mut self, value: V, service: ServiceType) -> Result<()> {
+    pub fn service<V: AsRef<[u8]>>(
+        &mut self,
+        index: usize,
+        value: V,
+        service: ServiceType,
+    ) -> Result<()> {
         let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("service-{}", self.service_count)));
-
+        did.set_fragment(Some(&format!("service-{}", index)));
         let endpoint = Url::parse(&String::from_utf8_lossy(value.as_ref()))?;
         self.service.push(Service {
             id: did,
@@ -212,9 +237,14 @@ impl EthrBuilder {
     /// * `enc` adds a key agreement key to the verificationMethod section and a corresponding entry to the keyAgreement section. This is used to perform a Diffie-Hellman key exchange and derive a secret key for encrypting messages to the DID that lists such a key.
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
-    pub fn external_public_key<V: AsRef<[u8]>>(&mut self, value: V, key: PublicKey) -> Result<()> {
+    pub fn external_public_key<V: AsRef<[u8]>>(
+        &mut self,
+        index: usize,
+        value: V,
+        key: PublicKey,
+    ) -> Result<()> {
         let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("delegate-{}", self.delegate_count)));
+        did.set_fragment(Some(&format!("delegate-{}", index)));
 
         let mut method = VerificationMethod {
             id: did,
@@ -257,9 +287,9 @@ impl EthrBuilder {
     /// * `sigAuth` which adds a EcdsaSecp256k1RecoveryMethod2020 to the verificationMethod section of document and a reference to it in the authentication section.
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
-    pub fn delegate(&mut self, delegate: &Address, purpose: KeyPurpose) {
+    pub fn delegate(&mut self, index: usize, delegate: &Address, purpose: KeyPurpose) {
         let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("delegate-{}", self.delegate_count)));
+        did.set_fragment(Some(&format!("delegate-{}", index)));
 
         // TODO: Handle ChainID
         let method = VerificationMethod {
@@ -284,7 +314,7 @@ impl EthrBuilder {
     }
 
     /// Build the DID Document
-    pub fn build(mut self) -> DidDocument {
+    pub fn build(mut self) -> Result<DidDocument> {
         let mut controller = self.id.clone();
         controller.set_fragment(Some("controller"));
 
@@ -311,7 +341,9 @@ impl EthrBuilder {
             self.authentication.push(controller_key);
         }
 
-        DidDocument {
+        self.build_keys()?;
+
+        Ok(DidDocument {
             context: self.context,
             id: self.id,
             also_known_as: self.also_known_as,
@@ -323,7 +355,33 @@ impl EthrBuilder {
             capability_invocation: self.capability_invocation,
             capability_delegation: self.capability_delegation,
             service: self.service,
+        })
+    }
+
+    fn build_keys(&mut self) -> Result<()> {
+        let mut keys = self.keys.drain().collect::<Vec<(Key, usize)>>();
+        keys.sort_by_key(|k| k.1);
+
+        for (key, index) in keys {
+            match key {
+                Key::Attribute {
+                    value, attribute, ..
+                } => match attribute {
+                    Attribute::PublicKey(key) => {
+                        self.external_public_key(index, value, key)?;
+                    }
+                    Attribute::Service(service) => {
+                        self.service(index, value, service)?;
+                    }
+                    Attribute::Other(_) => (),
+                },
+                Key::Delegate { delegate, purpose } => {
+                    self.delegate(index, &delegate, purpose);
+                }
+            }
         }
+
+        Ok(())
     }
 }
 
@@ -358,9 +416,10 @@ mod tests {
         builder.public_key(&identity).unwrap();
         builder.now(U256::zero());
         builder.attribute_event(event).unwrap();
+        let doc = builder.build().unwrap();
         assert_eq!(
-            builder.verification_method,
-            vec![VerificationMethod {
+            doc.verification_method[1],
+            VerificationMethod {
                 id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
                     .unwrap(),
                 verification_type: KeyType::EcdsaSecp256k1VerificationKey2019,
@@ -370,7 +429,7 @@ mod tests {
                     public_key_hex:
                         "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into()
                 }),
-            }]
+            }
         )
     }
     #[test]
@@ -386,9 +445,10 @@ mod tests {
         builder.public_key(&identity).unwrap();
         builder.now(U256::zero());
         builder.attribute_event(event).unwrap();
+        let doc = builder.build().unwrap();
         assert_eq!(
-            builder.verification_method,
-            vec![VerificationMethod {
+            doc.verification_method[1],
+            VerificationMethod {
                 id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
                     .unwrap(),
                 verification_type: KeyType::EcdsaSecp256k1VerificationKey2019,
@@ -397,7 +457,7 @@ mod tests {
                 verification_properties: Some(VerificationMethodProperties::PublicKeyBase58 {
                     public_key_base58: "DV4G2kpBKjE6zxKor7Cj21iL9x9qyXb6emqjszBXcuhz".into()
                 }),
-            }]
+            }
         );
     }
 
@@ -414,9 +474,10 @@ mod tests {
         builder.public_key(&identity).unwrap();
         builder.now(U256::zero());
         builder.attribute_event(event).unwrap();
+        let doc = builder.build().unwrap();
         assert_eq!(
-            builder.verification_method,
-            vec![VerificationMethod {
+            doc.verification_method[1],
+            VerificationMethod {
                 id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
                     .unwrap(),
                 verification_type: KeyType::X25519KeyAgreementKey2019,
@@ -426,7 +487,7 @@ mod tests {
                     public_key_base64:
                         "MCowBQYDK2VuAyEAEYVXd3/7B4d0NxpSsA/tdVYdz5deYcR1U+ZkphdmEFI=".into()
                 }),
-            }]
+            }
         );
     }
 
@@ -443,8 +504,9 @@ mod tests {
         builder.public_key(&identity).unwrap();
         builder.now(U256::zero());
         builder.attribute_event(event).unwrap();
+        let doc = builder.build().unwrap();
         assert_eq!(
-            builder.service,
+            doc.service,
             vec![Service {
                 id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#service-0")
                     .unwrap(),
@@ -456,7 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn test_attribute_increments() {
+    fn test_attribute_increments_correctly() {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let events = vec![
             DidattributeChangedFilter {
@@ -489,24 +551,26 @@ mod tests {
         let mut builder = EthrBuilder::default();
         builder.public_key(&identity).unwrap();
         builder.now(U256::zero());
+
         for event in events {
             builder.attribute_event(event).unwrap();
         }
 
+        let doc = builder.build().unwrap();
         assert_eq!(
-            builder.verification_method[0].id.fragment().unwrap(),
+            doc.verification_method[1].id.fragment().unwrap(),
             "delegate-0"
         );
         assert_eq!(
-            builder.verification_method[1].id.fragment().unwrap(),
+            doc.verification_method[2].id.fragment().unwrap(),
             "delegate-1"
         );
         assert_eq!(
-            builder.verification_method[2].id.fragment().unwrap(),
+            doc.verification_method[3].id.fragment().unwrap(),
             "delegate-2"
         );
-        assert_eq!(builder.service[0].id.fragment().unwrap(), "service-0");
-        assert_eq!(builder.service[1].id.fragment().unwrap(), "service-1");
+        assert_eq!(doc.service[0].id.fragment().unwrap(), "service-0");
+        assert_eq!(doc.service[1].id.fragment().unwrap(), "service-1");
     }
 
     #[test]
@@ -546,16 +610,17 @@ mod tests {
         for event in events {
             builder.attribute_event(event).unwrap();
         }
+        let doc = builder.build().unwrap();
 
         assert_eq!(
-            builder.verification_method[0].id.fragment().unwrap(),
+            doc.verification_method[1].id.fragment().unwrap(),
             "delegate-0"
         );
         assert_eq!(
-            builder.verification_method[1].id.fragment().unwrap(),
+            doc.verification_method[2].id.fragment().unwrap(),
             "delegate-2"
         );
-        assert_eq!(builder.service[0].id.fragment().unwrap(), "service-1");
+        assert_eq!(doc.service[0].id.fragment().unwrap(), "service-1");
     }
 
     #[test]
@@ -604,9 +669,10 @@ mod tests {
         for event in events {
             builder.delegate_event(event).unwrap();
         }
+        let doc = builder.build().unwrap();
 
         assert_eq!(
-            builder.verification_method[0],
+            doc.verification_method[1],
             VerificationMethod {
                 id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
                     .unwrap(),
@@ -621,7 +687,7 @@ mod tests {
         );
 
         assert_eq!(
-            builder.verification_method[1],
+            doc.verification_method[2],
             VerificationMethod {
                 id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1")
                     .unwrap(),
@@ -638,17 +704,17 @@ mod tests {
         assert_eq!(
             DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
                 .unwrap(),
-            builder.assertion_method[0]
+            doc.assertion_method[0]
         );
         assert_eq!(
             DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1")
                 .unwrap(),
-            builder.authentication[0]
+            doc.authentication[0]
         );
     }
 
     #[test]
-    fn test_revoke_attributes() {
+    fn test_revoke_delegates() {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let events = vec![
             DiddelegateChangedFilter {
@@ -675,7 +741,7 @@ mod tests {
         }
 
         // both events are valid
-        assert_eq!(builder.verification_method.len(), 2);
+        assert_eq!(builder.keys.len(), 2);
 
         let mut builder = EthrBuilder::default();
         builder.public_key(&identity).unwrap();
@@ -684,7 +750,7 @@ mod tests {
             builder.delegate_event(event.clone()).unwrap();
         }
         // only one event is valid
-        assert_eq!(builder.verification_method.len(), 1);
+        assert_eq!(builder.keys.len(), 1);
 
         let mut builder = EthrBuilder::default();
         builder.public_key(&identity).unwrap();
@@ -694,6 +760,67 @@ mod tests {
         }
 
         // no events valid
-        assert_eq!(builder.verification_method.len(), 0);
+        assert_eq!(builder.keys.len(), 0);
+    }
+
+    #[test]
+    fn test_delegates_sort() {
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let attributes = vec![
+            DidattributeChangedFilter {
+                name: *b"did/pub/Secp256k1/veriKey/hex   ",
+                value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                ..base_attr_changed(identity, None)
+            },
+            DidattributeChangedFilter {
+                name: *b"did/pub/Secp256k1/veriKey/base58",
+                value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                ..base_attr_changed(identity, None)
+            },
+        ];
+        let delegates = vec![
+            DiddelegateChangedFilter {
+                identity,
+                delegate_type: *b"veriKey                         ",
+                delegate: address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff"),
+                valid_to: U256::from(100),
+                previous_change: U256::zero(),
+            },
+            DiddelegateChangedFilter {
+                identity,
+                delegate_type: *b"sigAuth                         ",
+                delegate: address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff"),
+                valid_to: U256::from(50),
+                previous_change: U256::zero(),
+            },
+        ];
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::zero());
+
+        builder.attribute_event(attributes[0].clone()).unwrap();
+        builder.delegate_event(delegates[0].clone()).unwrap();
+        builder.attribute_event(attributes[1].clone()).unwrap();
+        builder.delegate_event(delegates[1].clone()).unwrap();
+
+        let doc = builder.build().unwrap();
+
+        assert_eq!(
+            doc.verification_method[1].id.fragment().unwrap(),
+            "delegate-0"
+        );
+        assert_eq!(
+            doc.verification_method[2].id.fragment().unwrap(),
+            "delegate-1"
+        );
+        assert_eq!(
+            doc.verification_method[3].id.fragment().unwrap(),
+            "delegate-2"
+        );
+        assert_eq!(
+            doc.verification_method[4].id.fragment().unwrap(),
+            "delegate-3"
+        );
     }
 }

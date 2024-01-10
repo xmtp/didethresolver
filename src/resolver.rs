@@ -129,6 +129,6 @@ impl Resolver {
                     );
             };
         }
-        Ok(base_document.build())
+        base_document.build()
     }
 }
