@@ -8,7 +8,7 @@ use ethers::{
     contract::LogMeta,
     prelude::{LocalWallet, Provider, SignerMiddleware},
     providers::{Middleware, Ws},
-    types::{Address, H160, H256, U256, U64},
+    types::{Address, Block, H160, H256, U256, U64},
 };
 
 use rand::{rngs::StdRng, SeedableRng};
@@ -103,13 +103,13 @@ impl Resolver {
                 doc.attribute_event(attribute_event)
             }
             DIDRegistryEvents::DidownerChangedFilter(owner_changed) => {
-                match doc.owner_event(owner_changed) {
-                    Err(err) => Err(err),
-                    Ok(v) => {
-                        *deactivated = v;
-                        Ok(())
-                    }
+                if doc
+                    .owner_event(owner_changed)
+                    .is_ok_and(|deactivated| deactivated)
+                {
+                    *deactivated = true;
                 }
+                Ok(())
             }
         };
 
@@ -142,7 +142,7 @@ impl Resolver {
         let mut current_version_id = U64::zero();
 
         base_document.now(now);
-        let mut last_updated_did_version_id: Option<U64> = { None };
+        let mut last_updated_did_version_id: Option<U64> = None;
         let mut deactivated = false;
 
         for (event, meta) in history {
@@ -185,23 +185,20 @@ impl Resolver {
             };
         }
 
-        // get the timestamp for the current_verison_id
-        let current_version_timestamp = match self.signer.get_block(current_version_id).await? {
-            Some(block) => {
-                if current_version_id != U64::zero() {
-                    Some::<String>(
-                        block
-                            .time()
-                            .unwrap_or_default()
-                            .format("%Y-%m-%dT%H:%M:%SZ")
-                            .to_string(),
-                    )
-                } else {
-                    None::<String>
-                }
-            }
-            None => None::<String>,
+        let block_time = |block: Block<H256>| {
+            block
+                .time()
+                .unwrap_or_default()
+                .format("%Y-%m-%dT%H:%M:%SZ")
+                .to_string()
         };
+
+        // get the timestamp for the current_verison_id
+        let current_version_timestamp = self
+            .signer
+            .get_block(current_version_id)
+            .await?
+            .map(block_time);
 
         let resolution_result = DidResolutionResult {
             document: base_document.build(),
@@ -211,13 +208,7 @@ impl Resolver {
                 updated: current_version_timestamp,
                 next_version_id: last_updated_did_version_id.map(|ver| ver.as_u64()),
                 next_update: match last_updated_did_version_id {
-                    Some(ver) => self.signer.get_block(ver).await?.map(|block| {
-                        block
-                            .time()
-                            .unwrap_or_default()
-                            .format("%Y-%m-%dT%H:%M:%SZ")
-                            .to_string()
-                    }),
+                    Some(ver) => self.signer.get_block(ver).await?.map(block_time),
                     None => None::<String>,
                 },
             }),
