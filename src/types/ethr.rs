@@ -594,7 +594,7 @@ mod tests {
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
-                name: *b"did/pub/Secp256k1/veriKey/base58",
+                name: *b"did/pub/Secp256k1/sigAuth/base58",
                 value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
                 ..base_attr_changed(identity, Some(10))
             },
