@@ -34,7 +34,7 @@ pub async fn test_attributes() -> Result<()> {
         did.send().await?.await?;
 
         let document = client.resolve_did(hex::encode(me)).await?;
-        
+
         assert_eq!(
             document.verification_method[1].id,
             DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
@@ -164,7 +164,7 @@ pub async fn test_attribute_revocation() -> Result<()> {
             b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
         );
         did.send().await?.await?;
-        
+
         let document = client.resolve_did(hex::encode(me)).await?;
         validate_document(&document).await;
 
@@ -173,6 +173,49 @@ pub async fn test_attribute_revocation() -> Result<()> {
             DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
         );
         assert_eq!(document.verification_method.len(), 1);
+
+        Ok(())
+    })
+    .await
+}
+
+#[tokio::test]
+pub async fn test_delegate_revocation() -> Result<()> {
+    with_client(None, |client, registry, signer, anvil| async move {
+        let me = signer.address();
+        let delegate: LocalWallet = anvil.keys()[4].clone().into();
+        let did = registry.add_delegate(
+            me,
+            *b"sigAuth                         ",
+            delegate.address(),
+            U256::from(604_800),
+        );
+        did.send().await?.await?;
+        let did = registry.add_delegate(
+            me,
+            *b"veriKey                         ",
+            delegate.address(),
+            U256::from(604_800),
+        );
+        did.send().await?.await?;
+
+        let did =
+            registry.revoke_delegate(me, *b"sigAuth                         ", delegate.address());
+        did.send().await?.await?;
+
+        let document = client.resolve_did(hex::encode(me)).await?;
+        validate_document(&document).await;
+
+        assert_eq!(
+            document.verification_method[0].id,
+            DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
+        );
+        // delegate 1, veriKey should still be valid after revoking delegate 0
+        assert_eq!(
+            document.verification_method[1].id,
+            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+        );
+        assert_eq!(document.verification_method.len(), 2);
 
         Ok(())
     })

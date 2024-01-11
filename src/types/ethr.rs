@@ -126,7 +126,9 @@ impl EthrBuilder {
             purpose: key_purpose,
         };
 
-        if event.valid_to < self.now {
+        log::debug!("KEY: {:?}, event: {:?}", key, event);
+        if event.valid_to <= self.now {
+            log::debug!("No Longer Valid {:?}", key);
             self.keys.remove(&key);
             return Ok(());
         }
@@ -160,7 +162,7 @@ impl EthrBuilder {
         };
 
         // invalid events still increment the counter, unless in the case of revocation
-        if event.valid_to < self.now {
+        if event.valid_to <= self.now {
             if self.keys.remove(&key).is_some() {
                 return Ok(());
             }
