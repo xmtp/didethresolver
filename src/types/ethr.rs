@@ -106,7 +106,7 @@ impl EthrBuilder {
     /// Set the controller of the document
     pub fn controller(&mut self, controller: &Address) -> Result<()> {
         let mut did = self.id.clone();
-        did.set_path(&format!("ethr:0x{}", hex::encode(&controller)))?;
+        did.set_path(&format!("ethr:0x{}", hex::encode(controller)))?;
         self.controller = Some(did);
         Ok(())
     }
@@ -126,7 +126,6 @@ impl EthrBuilder {
             purpose: key_purpose,
         };
 
-        log::debug!("KEY: {:?}, event: {:?}", key, event);
         if event.valid_to <= self.now {
             log::debug!("No Longer Valid {:?}", key);
             self.keys.remove(&key);
@@ -135,6 +134,7 @@ impl EthrBuilder {
 
         self.keys.insert(key, self.delegate_count);
         self.delegate_count += 1;
+
         Ok(())
     }
 
@@ -201,12 +201,14 @@ impl EthrBuilder {
     ///  When resolving DIDs with publicKey identifiers, if the controller (owner) address is different from the corresponding address of the publicKey, then the #controllerKey entry in the verificationMethod array MUST be omitted.
     ///
     ///  referecne: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#controller-changes-didownerchanged)
-    pub fn owner_event(&mut self, event: DidownerChangedFilter) -> Result<()> {
+    pub fn owner_event(&mut self, event: DidownerChangedFilter) -> Result<bool> {
         self.controller(&event.owner)?;
+        let mut deactivated = false;
         if event.owner == Address::from_str(NULL_ADDRESS).expect("const address is correct") {
-            log::warn!("Address has been deactivated. not implemented");
+            // set the deactivated flag in case the address was deactivated.
+            deactivated = true;
         }
-        Ok(())
+        Ok(deactivated)
     }
 
     /// Add an external service to the document.

@@ -70,7 +70,7 @@ pub enum ChainId {
 
 impl<'a> From<&'a str> for ChainId {
     fn from(digits: &'a str) -> ChainId {
-        let num = usize::from_str_radix(&digits, 16).expect("String must be valid Hex");
+        let num = usize::from_str_radix(digits, 16).expect("String must be valid Hex");
 
         match num {
             1 => ChainId::Mainnet,
@@ -126,7 +126,7 @@ impl DidUrl {
             None
         };
 
-        path.next().map(|p| parse_ethr_did(p).ok()).flatten();
+        path.next().and_then(|p| parse_ethr_did(p).ok());
 
         Ok(Self {
             url,
@@ -276,7 +276,7 @@ impl<'de> Deserialize<'de> for DidUrl {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        DidUrl::parse(&s).map_err(serde::de::Error::custom)
+        DidUrl::parse(s).map_err(serde::de::Error::custom)
     }
 }
 
