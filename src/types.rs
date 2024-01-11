@@ -220,7 +220,7 @@ pub struct PublicKey {
     pub encoding: KeyEncoding,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, Eq)]
 pub struct DidDocumentMetadata {
     #[serde(default, rename = "deactivated")]
     pub deactivated: bool,
@@ -240,18 +240,6 @@ pub struct DidDocumentMetadata {
         skip_serializing_if = "Option::is_none"
     )]
     pub next_update: Option<String>,
-}
-
-impl Default for DidDocumentMetadata {
-    fn default() -> Self {
-        DidDocumentMetadata {
-            deactivated: false,
-            version_id: 0,
-            updated: None,
-            next_version_id: None,
-            next_update: None,
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
