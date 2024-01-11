@@ -1,13 +1,15 @@
 mod integration_util;
 
+use std::str::FromStr;
+
 use anyhow::Result;
 use didethresolver::{
     rpc::DidRegistryClient,
-    types::{DidUrl, KeyType, VerificationMethodProperties},
+    types::{DidUrl, KeyType, VerificationMethodProperties, NULL_ADDRESS},
 };
 use ethers::{
     signers::{LocalWallet, Signer as _},
-    types::U256,
+    types::{Address, U256},
 };
 use integration_util::{validate_document, with_client};
 
@@ -75,15 +77,15 @@ pub async fn test_attributes() -> Result<()> {
             })
         );
         assert_eq!(
-            resolution_response.metadata.clone().unwrap().deactivated,
+            resolution_response.metadata.clone().deactivated,
             false
         );
         assert_eq!(
-            resolution_response.metadata.clone().unwrap().version_id,
+            resolution_response.metadata.clone().version_id,
             3
         );
         assert_eq!(
-            resolution_response.metadata.unwrap().next_version_id,
+            resolution_response.metadata.next_version_id,
             None
         );
 
@@ -116,15 +118,15 @@ pub async fn test_attributes_versions() -> Result<()> {
         validate_document(&resolution_response.document).await;
 
         assert_eq!(
-            resolution_response.metadata.clone().unwrap().deactivated,
+            resolution_response.metadata.clone().deactivated,
             false
         );
         assert_eq!(
-            resolution_response.metadata.clone().unwrap().version_id,
+            resolution_response.metadata.clone().version_id,
             2
         );
         assert_eq!(
-            resolution_response.metadata.unwrap().next_version_id,
+            resolution_response.metadata.next_version_id,
             Some::<u64>(3)
         );
 
@@ -269,6 +271,24 @@ pub async fn test_delegate_revocation() -> Result<()> {
             DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
         );
         assert_eq!(document.verification_method.len(), 2);
+
+        Ok(())
+    })
+    .await
+}
+
+#[tokio::test]
+pub async fn test_owner_revocation() -> Result<()> {
+    with_client(None, |client, registry, signer, _| async move {
+        let me = signer.address();
+        let null = Address::from_str(NULL_ADDRESS.strip_prefix("0x").unwrap()).unwrap();
+        let did = registry.change_owner(me, null);
+        did.send().await?.await?;
+
+        let resolved = client.resolve_did(hex::encode(me), None).await?;
+        validate_document(&resolved.document).await;
+
+        assert!(resolved.metadata.deactivated);
 
         Ok(())
     })

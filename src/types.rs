@@ -242,6 +242,18 @@ pub struct DidDocumentMetadata {
     pub next_update: Option<String>,
 }
 
+impl Default for DidDocumentMetadata {
+    fn default() -> Self {
+        DidDocumentMetadata {
+            deactivated: false,
+            version_id: 0,
+            updated: None,
+            next_version_id: None,
+            next_update: None,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct DidResolutionMetadata {
     #[serde(default, rename = "contentType")]
@@ -250,17 +262,10 @@ pub struct DidResolutionMetadata {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DidResolutionResult {
-    #[serde(
-        default,
-        rename = "didDocumentMetadata",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub metadata: Option<DidDocumentMetadata>,
-    #[serde(
-        rename = "didResolutionMetadata",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub resolution_metadata: Option<DidResolutionMetadata>,
+    #[serde(default, rename = "didDocumentMetadata")]
+    pub metadata: DidDocumentMetadata,
+    #[serde(rename = "didResolutionMetadata")]
+    pub resolution_metadata: DidResolutionMetadata,
     #[serde(rename = "didDocument")]
     pub document: DidDocument,
 }

@@ -56,6 +56,7 @@ pub struct EthrBuilder {
     service: Vec<Service>,
     delegate_count: usize,
     service_count: usize,
+    is_deactivated: bool,
     now: U256,
     keys: HashMap<Key, usize>,
 }
@@ -81,6 +82,7 @@ impl Default for EthrBuilder {
             service_count: 0,
             now: U256::zero(),
             keys: Default::default(),
+            is_deactivated: false,
         }
     }
 }
@@ -109,6 +111,10 @@ impl EthrBuilder {
         did.set_path(&format!("ethr:0x{}", hex::encode(controller)))?;
         self.controller = Some(did);
         Ok(())
+    }
+
+    pub fn is_deactivated(&mut self) -> bool {
+        self.is_deactivated
     }
 
     /// Add a delegate to the DID Document.
@@ -201,14 +207,13 @@ impl EthrBuilder {
     ///  When resolving DIDs with publicKey identifiers, if the controller (owner) address is different from the corresponding address of the publicKey, then the #controllerKey entry in the verificationMethod array MUST be omitted.
     ///
     ///  referecne: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#controller-changes-didownerchanged)
-    pub fn owner_event(&mut self, event: DidownerChangedFilter) -> Result<bool> {
+    pub fn owner_event(&mut self, event: DidownerChangedFilter) -> Result<()> {
         self.controller(&event.owner)?;
-        let mut deactivated = false;
         if event.owner == Address::from_str(NULL_ADDRESS).expect("const address is correct") {
             // set the deactivated flag in case the address was deactivated.
-            deactivated = true;
+            self.is_deactivated = true;
         }
-        Ok(deactivated)
+        Ok(())
     }
 
     /// Add an external service to the document.
@@ -345,7 +350,9 @@ impl EthrBuilder {
             self.authentication.push(controller_key);
         }
 
-        self.build_keys()?;
+        if !self.is_deactivated {
+            self.build_keys()?;
+        }
 
         Ok(DidDocument {
             context: self.context,
@@ -825,6 +832,35 @@ mod tests {
         assert_eq!(
             doc.verification_method[4].id.fragment().unwrap(),
             "delegate-3"
+        );
+    }
+
+    #[test]
+    fn test_owner_revoked() {
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let events = vec![
+            DidownerChangedFilter {
+                identity,
+                owner: address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff"),
+                previous_change: U256::zero(),
+            },
+            DidownerChangedFilter {
+                identity,
+                owner: address("0x0000000000000000000000000000000000000000"),
+                previous_change: U256::one(),
+            },
+        ];
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::zero());
+        for event in events {
+            builder.owner_event(event).unwrap();
+        }
+
+        assert_eq!(
+            builder.controller,
+            Some(DidUrl::parse("did:ethr:0x0000000000000000000000000000000000000000").unwrap())
         );
     }
 }
