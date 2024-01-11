@@ -95,7 +95,7 @@ where
     handle.stopped().await;
 
     // it's important to keep a reference to anvil alive, even if we don't use it after or in the
-    // predicate, `fun`, because otherwise our server will shutoff.
+    // predicate, `fun`, otherwise our server will shutoff.
     drop(anvil);
 
     match result {

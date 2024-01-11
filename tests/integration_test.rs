@@ -13,7 +13,7 @@ use ethers::{
 };
 use integration_util::{validate_document, with_client};
 
-//TODO: Add tests for: Errors, formats, entire document asserts, different padding methods(0s and spaces)
+//TODO: Add tests for: Errors, formats, entire document asserts
 
 #[tokio::test]
 pub async fn test_attributes() -> Result<()> {
@@ -255,7 +255,7 @@ pub async fn test_delegate_revocation() -> Result<()> {
         did.send().await?.await?;
 
         let did =
-            registry.revoke_delegate(me, *b"sigAuth                         ", delegate.address());
+            registry.revoke_delegate(me, *b"sigAuth0000000000000000000000000", delegate.address());
         did.send().await?.await?;
 
         let document = client.resolve_did(hex::encode(me), None).await?.document;

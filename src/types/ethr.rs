@@ -11,8 +11,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::{
-    Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey, Service,
-    ServiceType, VerificationMethod, VerificationMethodProperties,
+    AddressOrHexKey, Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey,
+    Service, ServiceType, VerificationMethod, VerificationMethodProperties,
 };
 use crate::{
     resolver::did_registry::{
@@ -70,8 +70,8 @@ impl Default for EthrBuilder {
             ],
             id: DidUrl::parse("did:ethr:0x0000000000000000000000000000000000000000").unwrap(),
             also_known_as: Default::default(),
-            controller: None,
             verification_method: Default::default(),
+            controller: None,
             authentication: Default::default(),
             assertion_method: Default::default(),
             key_agreement: Default::default(),
@@ -322,13 +322,13 @@ impl EthrBuilder {
         }
     }
 
-    /// Build the DID Document
-    pub fn build(mut self) -> Result<DidDocument> {
-        let mut controller = self.id.clone();
+    /// Handle controller changes according to [owner changed](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#controller-changes-didownerchanged) and [registration](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#create-register)
+    fn build_controller(&mut self) {
+        let mut controller = self.controller.clone().unwrap_or(self.id.clone());
         controller.set_fragment(Some("controller"));
 
         self.verification_method.push(VerificationMethod {
-            id: controller,
+            id: controller.clone(),
             controller: self.id.clone(),
             verification_type: KeyType::EcdsaSecp256k1VerificationKey2019,
             verification_properties: Some(VerificationMethodProperties::BlockchainAccountId {
@@ -336,7 +336,9 @@ impl EthrBuilder {
             }),
         });
 
-        if self.controller.as_ref() == Some(&self.id) {
+        // if we are resolving for a key that is a public key which matches the id, we need to add
+        // another `controllerKey` verification method
+        if let AddressOrHexKey::HexKey(_) = self.id.id() {
             let mut controller_key = self.id.clone();
             controller_key.set_fragment(Some("controllerKey"));
             self.verification_method.push(VerificationMethod {
@@ -347,8 +349,14 @@ impl EthrBuilder {
                     blockchain_account_id: self.id.id().to_string(),
                 }),
             });
-            self.authentication.push(controller_key);
+            self.authentication.push(controller_key.clone());
+            self.assertion_method.push(controller_key);
         }
+    }
+
+    /// Build the DID Document
+    pub fn build(mut self) -> Result<DidDocument> {
+        self.build_controller();
 
         if !self.is_deactivated {
             self.build_keys()?;
