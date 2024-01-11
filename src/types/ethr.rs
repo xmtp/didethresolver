@@ -40,7 +40,7 @@ enum Key {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 /// DID Ethr Builder
 pub struct EthrBuilder {
     context: Vec<Url>,
@@ -119,7 +119,7 @@ impl EthrBuilder {
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
     pub fn delegate_event(&mut self, event: DiddelegateChangedFilter) -> Result<()> {
         let delegate_type = String::from_utf8_lossy(&event.delegate_type);
-        let key_purpose = types::parse_delegate(&delegate_type.to_string())?;
+        let key_purpose = types::parse_delegate(&delegate_type)?;
 
         let key = Key::Delegate {
             delegate: event.delegate,
