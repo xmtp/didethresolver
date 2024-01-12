@@ -239,21 +239,21 @@ mod test {
               "https://www.w3.org/ns/did/v1",
               "https://w3id.org/security/suites/ed25519-2020/v1"
             ],
-            "controller": "did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad",
-            "id": "did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad",
+            "controller": "did:ethr:mainnet:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
+            "id": "did:ethr:mainnet:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
             "service": [
               {
-                "id": "did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad",
-                "recipientKeys": "0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad",
+                "id": "did:ethr:mainnet:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
+                "recipientKeys": "0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
                 "serviceEndpoint": "https://xmtp.com/resolver",
                 "type": "MessagingService"
               }
             ],
             "verificationMethod": [
               {
-                "controller": "did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad",
-                "id": "did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad",
-                "publicKeyMultibase": "0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad",
+                "controller": "did:ethr:mainnet:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
+                "id": "did:ethr:mainnet:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
+                "publicKeyMultibase": "0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
                 "type": "Ed25519VerificationKey2020"
               }
             ]
@@ -269,28 +269,28 @@ mod test {
                         .try_into()
                         .unwrap()
                 ],
-                id: DidUrl::parse("did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad").unwrap(),
+                id: DidUrl::parse("did:ethr:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad").unwrap(),
                 controller: Some(
-                    DidUrl::parse("did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad").unwrap()
+                    DidUrl::parse("did:ethr:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad").unwrap()
                 ),
                 service: vec![Service {
-                    id: DidUrl::parse("did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad")
+                    id: DidUrl::parse("did:ethr:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad")
                         .unwrap(),
-                    recipient_keys: "0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad".to_string(),
+                    recipient_keys: "0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad".to_string(),
                     service_endpoint: Url::parse("https://xmtp.com/resolver").unwrap(),
                     service_type: ServiceType::Messaging,
                 }],
                 verification_method: vec![VerificationMethod {
-                    id: DidUrl::parse("did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad")
+                    id: DidUrl::parse("did:ethr:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad")
                         .unwrap(),
                     controller: DidUrl::parse(
-                        "did:ethr:0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad"
+                        "did:ethr:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad"
                     )
                     .unwrap(),
                     verification_type: KeyType::Ed25519VerificationKey2020,
                     verification_properties: Some(
                         VerificationMethodProperties::PublicKeyMultibase {
-                            public_key_multibase: "0x6CEb0bF1f28ca4165d5C0A04f61DC733987eD6ad"
+                            public_key_multibase: "0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad"
                                 .to_string(),
                         }
                     ),
