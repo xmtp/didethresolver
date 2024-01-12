@@ -79,7 +79,7 @@ impl EthrBuilder {
 
     /// set the identity of the document
     pub fn public_key(&mut self, key: &Address) -> Result<()> {
-        self.id.set_path(&format!("ethr:0x{}", hex::encode(key)))?;
+        self.id.set_account(types::Account::Address(key.clone()));
         Ok(())
     }
 
@@ -91,7 +91,7 @@ impl EthrBuilder {
     /// Set the controller of the document
     pub fn controller(&mut self, controller: &Address) -> Result<()> {
         let mut did = self.id.clone();
-        did.set_path(&format!("ethr:0x{}", hex::encode(&controller)))?;
+        did.set_account(types::Account::Address(controller.clone()));
         self.controller = Some(did);
         Ok(())
     }

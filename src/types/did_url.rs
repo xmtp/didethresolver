@@ -97,7 +97,7 @@ impl ToString for Network {
 
 impl<'a> From<&'a str> for Network {
     fn from(chain_id: &'a str) -> Network {
-        let chain_id = usize::from_str_radix(dbg!(chain_id), 16).expect("String must be valid Hex");
+        let chain_id = usize::from_str_radix(chain_id, 16).expect("String must be valid Hex");
 
         match chain_id {
             1 => Network::Mainnet,
@@ -128,7 +128,7 @@ impl DidUrl {
     ///
     /// let did_url = "did:not:123";
     /// let did_url = DidUrl::parse(did_url).unwrap_err();
-    /// assert_eq!(did_url.source().unwrap().to_string(), "error at 1:1: expected one of \"ethr:\", the only supported method is `ethr`");
+    /// assert_eq!(did_url.source().unwrap().to_string(), "error at 1:1: expected one of \"ethr\", the only supported method is `ethr`");
     /// ```
     /// ```
     /// use didethresolver::types::DidUrl;
@@ -300,9 +300,12 @@ impl DidUrl {
     /// # Errors
     /// returns a `Error` if the parsing of the URI fails because it is not the expected format or if the method is unsupported.
     ///
-    pub fn set_path(&mut self, path: &str) -> Result<()> {
+    pub fn set_path(&mut self, path: &str) {
         self.path = path.to_string();
-        Ok(())
+    }
+
+    pub fn set_account(&mut self, account: Account) {
+        self.did.account = account;
     }
 }
 
@@ -349,7 +352,7 @@ mod tests {
 
         let err = DidUrl::parse("did:pkh:0x7e575682A8E450E33eB0493f9972821aE333cd7F").unwrap_err();
         assert_eq!(
-            "error at 1:1: expected one of \"ethr:\", the only supported method is `ethr`"
+            "error at 1:1: expected one of \"ethr\", the only supported method is `ethr`"
                 .to_string(),
             err.source().unwrap().to_string()
         );
