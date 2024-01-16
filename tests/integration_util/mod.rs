@@ -69,9 +69,8 @@ where
     // a port of 0 chooses any open port
     let server = Server::builder().build("127.0.0.1:0").await.unwrap();
     let addr = server.local_addr().unwrap();
-    let resolver = Resolver::new(anvil.ws_endpoint(), registry_address)
-        .await
-        .unwrap();
+    let signer = client(&anvil, anvil.keys()[0].clone().into()).await;
+    let resolver = Resolver::new(signer, registry_address).await.unwrap();
     let handle = server.start(DidRegistryMethods::new(resolver).into_rpc());
 
     let client = WsClientBuilder::default()
