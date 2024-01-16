@@ -3,7 +3,6 @@ pub mod did_registry;
 
 use std::sync::Arc;
 
-use anyhow::Result;
 use ethers::{
     contract::LogMeta,
     providers::Middleware,
@@ -11,8 +10,11 @@ use ethers::{
 };
 
 use self::did_registry::{DIDRegistry, DIDRegistryEvents};
-use crate::types::{
-    DidDocument, DidDocumentMetadata, DidResolutionMetadata, DidResolutionResult, EthrBuilder,
+use crate::{
+    error::ResolverError,
+    types::{
+        DidDocument, DidDocumentMetadata, DidResolutionMetadata, DidResolutionResult, EthrBuilder,
+    },
 };
 
 /// A resolver for did:ethr that follows the steps outlined in the [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#read-resolve) in order to resolve a did:ethr identifier.
@@ -22,7 +24,7 @@ pub struct Resolver<M> {
 }
 
 impl<M: Middleware + 'static> Resolver<M> {
-    pub async fn new(middleware: M, registry: Address) -> Result<Self> {
+    pub async fn new(middleware: M, registry: Address) -> Result<Self, ResolverError<M>> {
         let signer = Arc::new(middleware);
         let registry = DIDRegistry::new(registry, signer.clone());
         log::debug!("Using deployed registry at {}", registry.address());
@@ -33,18 +35,22 @@ impl<M: Middleware + 'static> Resolver<M> {
         &self,
         public_key: H160,
         version_id: Option<U64>,
-    ) -> Result<DidResolutionResult> {
+    ) -> Result<DidResolutionResult, ResolverError<M>> {
         let history = self.changelog(public_key).await?;
         self.wrap_did_resolution(public_key, version_id, history)
             .await
     }
 
-    async fn changelog(&self, public_key: H160) -> Result<Vec<(DIDRegistryEvents, LogMeta)>> {
+    async fn changelog(
+        &self,
+        public_key: H160,
+    ) -> Result<Vec<(DIDRegistryEvents, LogMeta)>, ResolverError<M>> {
         let mut previous_change: U64 = self
             .registry
             .changed(public_key)
             .call()
-            .await?
+            .await
+            .unwrap()
             .as_u64()
             .into();
 
@@ -62,7 +68,8 @@ impl<M: Middleware + 'static> Resolver<M> {
                 .to_block(previous_change)
                 .topic1(H256::from(public_key))
                 .query_with_meta()
-                .await?;
+                .await
+                .unwrap();
 
             for (event, meta) in events {
                 if event.previous_change() < previous_change {
@@ -120,12 +127,12 @@ impl<M: Middleware + 'static> Resolver<M> {
         public_key: H160,
         version_id: Option<U64>,
         history: Vec<(DIDRegistryEvents, LogMeta)>,
-    ) -> Result<DidResolutionResult> {
+    ) -> Result<DidResolutionResult, ResolverError<M>> {
         let mut base_document = DidDocument::ethr_builder();
         base_document.public_key(&public_key)?;
 
-        let current_block = self.signer.get_block_number().await?;
-        let current_block = self.signer.get_block(current_block).await?;
+        let current_block = self.signer.get_block_number().await.unwrap();
+        let current_block = self.signer.get_block(current_block).await.unwrap();
 
         let now = current_block.map(|b| b.timestamp).unwrap_or(U256::zero());
         let mut current_version_id = U64::zero();
@@ -186,7 +193,8 @@ impl<M: Middleware + 'static> Resolver<M> {
         let current_version_timestamp = self
             .signer
             .get_block(current_version_id)
-            .await?
+            .await
+            .unwrap()
             .map(block_time);
 
         let resolution_result = DidResolutionResult {
@@ -197,7 +205,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                 updated: current_version_timestamp,
                 next_version_id: last_updated_did_version_id.map(|ver| ver.as_u64()),
                 next_update: match last_updated_did_version_id {
-                    Some(ver) => self.signer.get_block(ver).await?.map(block_time),
+                    Some(ver) => self.signer.get_block(ver).await.unwrap().map(block_time),
                     None => None::<String>,
                 },
             }),

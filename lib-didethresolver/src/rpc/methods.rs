@@ -43,8 +43,7 @@ impl<M: Middleware + 'static> DidRegistryServer for DidRegistryMethods<M> {
                 H160::from_str(&public_key).map_err(RpcError::from)?,
                 parsed_version_id,
             )
-            .await
-            .map_err(into_error_object)?;
+            .await?;
 
         Ok(resolution_result)
     }
@@ -66,9 +65,4 @@ impl From<RpcError> for ErrorObjectOwned {
             }
         }
     }
-}
-
-/// Convenience function to convert an anyhow::Error into an ErrorObjectOwned.
-fn into_error_object(error: anyhow::Error) -> ErrorObjectOwned {
-    ErrorObjectOwned::owned(-31000, error.to_string(), None::<()>)
 }

@@ -1,12 +1,12 @@
 //! Convenience Wrapper around [`Url`] for DID URIs according to the [DID Spec](https://www.w3.org/TR/did-core/#did-syntax)
 
-use anyhow::{Context, Error, Result};
 use ethers::types::Address;
 use serde::{Deserialize, Serialize, Serializer};
 use smart_default::SmartDefault;
 use url::Url;
 
 use super::parse_ethr_did;
+use crate::error::DidError;
 
 /// A DID URL, based on the did specification, [DID URL Syntax](https://www.w3.org/TR/did-core/#did-url-syntax)
 /// Currently only supports did:ethr: [did-ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
@@ -97,14 +97,14 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// use didethresolver::types::DidUrl;
+    /// use lib_didethresolver::types::DidUrl;
     ///
     /// let did_url = "did:not:123";
     /// let did_url = DidUrl::parse(did_url).unwrap_err();
-    /// assert_eq!(did_url.source().unwrap().to_string(), "error at 1:1: expected one of \"ethr:\", the only supported method is `ethr`");
+    /// assert_eq!(did_url.to_string(), "Parsing of ethr:did failed, error at 1:1: expected one of \"ethr:\", the only supported method is `ethr`");
     /// ```
     /// ```
-    /// use didethresolver::types::DidUrl;
+    /// use lib_didethresolver::types::DidUrl;
     ///
     /// let did_url = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
     /// let did_url = DidUrl::parse(did_url).unwrap();
@@ -114,14 +114,14 @@ impl DidUrl {
     /// returns a `Error` if the parsing of the URI fails or if the extracted
     /// components (method name, method-specific ID) do not conform to the expected DID structure.
     ///
-    pub fn parse<S: AsRef<str>>(input: S) -> Result<Self, Error> {
+    pub fn parse<S: AsRef<str>>(input: S) -> Result<Self, DidError> {
         let url = Url::parse(input.as_ref())?;
 
         let mut path = url.path().split('/');
 
         let method_and_id = if let Some(path) = path.next() {
             log::debug!("Parsing method and id from path: {}", path);
-            Some(parse_ethr_did(path).context("Method and Id could not be parsed from URL")?)
+            Some(parse_ethr_did(path)?)
         } else {
             None
         };
@@ -144,7 +144,7 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// use didethresolver::types::{DidUrl, Method};
+    /// use lib_didethresolver::types::{DidUrl, Method};
     ///
     /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// assert_eq!(did_url.method(), &Method::Ethr);
@@ -161,7 +161,7 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// use didethresolver::types::{ChainId, DidUrl};
+    /// use lib_didethresolver::types::{ChainId, DidUrl};
     /// let did_url = DidUrl::parse("did:ethr:0x01:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// assert_eq!(did_url.chain_id(), &ChainId::Mainnet);
     /// ```
@@ -177,7 +177,7 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// use didethresolver::types::{AddressOrHexKey, DidUrl};
+    /// use lib_didethresolver::types::{AddressOrHexKey, DidUrl};
     /// use ethers::types::Address;
     ///
     /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
@@ -197,7 +197,7 @@ impl DidUrl {
     ///
     ///  # Examples
     /// ```
-    /// use didethresolver::types::DidUrl;
+    /// use lib_didethresolver::types::DidUrl;
     ///
     /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#delegate-0").unwrap();
     /// assert_eq!(did_url.fragment(), Some("delegate-0"));
@@ -214,7 +214,7 @@ impl DidUrl {
     ///
     ///
     /// ```
-    /// use didethresolver::types::DidUrl;
+    /// use lib_didethresolver::types::DidUrl;
     ///
     /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// did_url.set_fragment(Some("controller"));
@@ -238,7 +238,7 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// use didethresolver::types::DidUrl;
+    /// use lib_didethresolver::types::DidUrl;
     ///
     /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// did_url.set_path("ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
@@ -248,13 +248,12 @@ impl DidUrl {
     /// # Errors
     /// returns a `Error` if the parsing of the URI fails because it is not the expected format or if the method is unsupported.
     ///
-    pub fn set_path(&mut self, path: &str) -> Result<()> {
+    pub fn set_path(&mut self, path: &str) -> Result<(), DidError> {
         self.url.set_path(path);
         let mut path = self.url.path().split('/');
         if let Some(path) = path.next() {
             log::debug!("Parsing method and id from path: {}", path);
-            self.method_and_id =
-                parse_ethr_did(path).context("Method and Id could not be parsed from URL")?;
+            self.method_and_id = parse_ethr_did(path)?;
         };
         Ok(())
     }
@@ -296,9 +295,9 @@ mod tests {
 
         let err = DidUrl::parse("did:pkh:0x7e575682A8E450E33eB0493f9972821aE333cd7F").unwrap_err();
         assert_eq!(
-            "error at 1:1: expected one of \"ethr:\", the only supported method is `ethr`"
+            "Parsing of ethr:did failed, error at 1:1: expected one of \"ethr:\", the only supported method is `ethr`"
                 .to_string(),
-            err.source().unwrap().to_string()
+            err.to_string()
         );
     }
 
