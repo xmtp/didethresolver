@@ -66,3 +66,10 @@ $ docker build . -t didethresolver:1
 ## Usage
 
 See the `examples/` folder for more usage examples
+
+## Organization
+
+The workspace is organized into a binary and library crate. the binary,
+`didethresolver-gateway`, runs a standalone JSON-RPC server which resolves DIDs.
+The library, `lib-didethresolver` provides methods and types used to resolve
+dids, as well as build a JSON-RPC client and server.
