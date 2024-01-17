@@ -33,7 +33,6 @@ impl DidRegistryServer for DidRegistryMethods {
             .await
             .map_err(into_error_object)?;
 
-        println!("dddddocumn: {:?}", document.verification_method[0].id);
         Ok(document)
     }
 }

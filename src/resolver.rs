@@ -43,7 +43,6 @@ impl Resolver {
     }
 
     async fn changelog(&self, public_key: H160) -> Result<Vec<(DIDRegistryEvents, LogMeta)>> {
-        println!("connecting registry");
         let mut previous_change: U64 = self
             .registry
             .changed(public_key)

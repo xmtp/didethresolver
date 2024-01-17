@@ -103,7 +103,6 @@ pub async fn test_delegate() -> Result<()> {
         did.send().await?.await?;
 
         let document = client.resolve_did(hex::encode(me)).await?;
-        println!("this this docu{:?}", document.verification_method[0].id);
 
         validate_document(&document).await;
         

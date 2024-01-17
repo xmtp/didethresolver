@@ -259,7 +259,7 @@ impl EthrBuilder {
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
     pub fn delegate(&mut self, delegate: &Address, purpose: KeyPurpose) {
         let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("delegate-{}", dbg!(self.delegate_count))));
+        did.set_fragment(Some(&format!("delegate-{}", self.delegate_count)));
 
         // TODO: Handle ChainID
         let method = VerificationMethod {
