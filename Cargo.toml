@@ -2,7 +2,7 @@
 members = [
   "lib-didethresolver",
   "didethresolver-gateway",
-   "examples/*"
+   "examples/*",
 ]
 
 exclude = [ ]
@@ -20,5 +20,6 @@ chrono = "0.4.31"
 ethers = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
-anyhow = "1.0.79"
+anyhow = "1.0"
+thiserror = "1.0"
 

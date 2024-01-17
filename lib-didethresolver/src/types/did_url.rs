@@ -93,7 +93,7 @@ impl DidUrl {
     ///
     /// # Returns
     /// A `Result` which, on success, contains the `DidUrl` object representing the parsed DID URI.
-    /// On failure, it returns a [`Error`] indicating the reason for the parsing failure.
+    /// On failure, it returns a [`DidError`] indicating the reason for the parsing failure.
     ///
     /// # Examples
     /// ```
@@ -111,7 +111,7 @@ impl DidUrl {
     /// ```
     ///
     /// # Errors
-    /// returns a `Error` if the parsing of the URI fails or if the extracted
+    /// returns a [`DidError`] if the parsing of the URI fails or if the extracted
     /// components (method name, method-specific ID) do not conform to the expected DID structure.
     ///
     pub fn parse<S: AsRef<str>>(input: S) -> Result<Self, DidError> {
@@ -246,7 +246,7 @@ impl DidUrl {
     /// ```
     ///
     /// # Errors
-    /// returns a `Error` if the parsing of the URI fails because it is not the expected format or if the method is unsupported.
+    /// returns a [`DidError`] if the parsing of the URI fails because it is not the expected format or if the method is unsupported.
     ///
     pub fn set_path(&mut self, path: &str) -> Result<(), DidError> {
         self.url.set_path(path);

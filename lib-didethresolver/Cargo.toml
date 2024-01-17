@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 resolver = "2"
 
+[package.metadata."docs.rs"]
+all-features = true
+
 [profile.release]
 panic = 'abort'
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -17,33 +20,34 @@ ethers.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 serde.workspace = true
+thiserror.workspace = true
 
 url = { version = "2.5", features = ["serde"] }
 percent-encoding = "2.3.1"
-thiserror = "1"
 rand = "0.8"
 hex = "0.4"
 base64 = "0.21"
 bs58 = "0.5"
 smart-default = "0.7"
 sha3 = "0.10"
-rustc-hex= "2.1"
 peg = "0.8"
 dotenvy = "0.15.7"
 envy = "0.4.2"
+rustc-hex = "2.1"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["time"] }
-jsonrpsee = { workspace = true, features = ["macros"] }
+jsonrpsee = { workspace = true, features = ["macros", "ws-client"] }
+ethers = { workspace = true, features = ["ws"] }
 tracing-subscriber.workspace = true 
 serde_json.workspace = true
+tokio-test = "0.4"
 futures = "0.3"
 ctor = "0.2.5"
 surf = "2.3"
 
+
 [features]
-default = ["client", "server"]
-# Enables auto-generated JSON-RPC Client.
+default = []
 client = ["jsonrpsee/client"]
-# Enables auto-generated JSON-RPC Server.
 server = ["jsonrpsee/server"]

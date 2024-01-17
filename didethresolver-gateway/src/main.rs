@@ -84,7 +84,7 @@ use serde::Deserialize;
 use std::str::FromStr;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
-use lib_didethresolver::{rpc, DidRegistryServer, Resolver};
+use lib_didethresolver::{rpc::DidRegistryMethods, DidRegistryServer, Resolver};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -151,7 +151,7 @@ pub async fn run() -> Result<()> {
             provider_endpoint, registry_address,
         ))?;
 
-    let handle = server.start(rpc::DidRegistryMethods::new(resolver).into_rpc());
+    let handle = server.start(DidRegistryMethods::new(resolver).into_rpc());
 
     log::info!("Server Started at {addr}");
     handle.stopped().await;

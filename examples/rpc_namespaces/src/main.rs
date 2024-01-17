@@ -1,6 +1,6 @@
 //! Example of composing a did:ethr resolution server with multiple other namespaces/rpcs.
 //! This example creates a did:ethr resolver connected to the Sepolia Ethereum testnet and composes
-//! the rpc with the [`turtle`] rpc
+//! the rpc with the [`TurtleMethods`] rpc
 //!
 //! All did methods will be available under the `did_` namespace, all turtle methods under the `turtle_` namespace.
 //!
