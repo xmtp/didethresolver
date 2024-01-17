@@ -1,8 +1,14 @@
 [package]
 name = "lib-didethresolver"
 version = "0.1.0"
+authors = ["XMTP Labs <eng@xmtp.com>"]
 edition = "2021"
-resolver = "2"
+description = "Library for did:ethr resolution"
+homepage = "https://github.com/xmtp/didethresolver"
+repository = "https://github.com/xmtp/didethresolver"
+license = "MIT"
+keywords = ["ethereum", "did", "did:ethr", "jsonrpc"]
+categories = ["web-programming::websocket", "web-programming::http-server", "web-programming::http-client", "cryptography::cryptocurrencies"]
 
 [package.metadata."docs.rs"]
 all-features = true

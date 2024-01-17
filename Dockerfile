@@ -16,6 +16,6 @@ COPY --chown=xmtp:xmtp . .
 
 RUN cargo fmt --check --all
 RUN cargo clippy --all-features --no-deps -- -D warnings
-RUN cargo test --all-features
+RUN cargo test --workspace --all-features
 
 CMD cargo run
