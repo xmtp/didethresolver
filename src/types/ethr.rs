@@ -259,7 +259,7 @@ impl EthrBuilder {
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
     pub fn delegate(&mut self, delegate: &Address, purpose: KeyPurpose) {
         let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("delegate-{}", self.delegate_count)));
+        did.set_fragment(Some(&format!("delegate-{}", dbg!(self.delegate_count))));
 
         // TODO: Handle ChainID
         let method = VerificationMethod {
@@ -608,11 +608,15 @@ mod tests {
         assert_eq!(
             builder.verification_method[0],
             VerificationMethod {
-                id: DidUrl::parse("did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
-                    .unwrap(),
+                id: DidUrl::parse(
+                    "did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0"
+                )
+                .unwrap(),
                 verification_type: KeyType::EcdsaSecp256k1RecoveryMethod2020,
-                controller: DidUrl::parse("did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f")
-                    .unwrap(),
+                controller: DidUrl::parse(
+                    "did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f"
+                )
+                .unwrap(),
                 verification_properties: Some(VerificationMethodProperties::BlockchainAccountId {
                     // TODO: Handle chain_id
                     blockchain_account_id: "0xfc88f377218e665d8ede610034c4ab2b81e5f9ff".into()
@@ -623,8 +627,10 @@ mod tests {
         assert_eq!(
             builder.verification_method[1],
             VerificationMethod {
-                id: DidUrl::parse("did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1")
-                    .unwrap(),
+                id: DidUrl::parse(
+                    "did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1"
+                )
+                .unwrap(),
                 verification_type: KeyType::EcdsaSecp256k1RecoveryMethod2020,
                 controller: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f")
                     .unwrap(),

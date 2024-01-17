@@ -14,19 +14,17 @@ peg::parser! {
         ///
         /// # Example
         /// ```rust
-        /// use didethresolver::types::{Method, Id, ChainId, AddressOrHexKey, MethodAndId, parse_ethr_did};
+        /// use didethresolver::types::{Did, Method, Network, Account, parse_ethr_did};
         /// use ethers::types::Address;
         /// let parsed = parse_ethr_did("ethr:mainnet:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
         /// assert_eq!(
         ///    parsed,
         ///    Did {
         ///        method: Method::Ethr,
-        ///        id: Id {
-        ///            chain: ChainId::Mainnet,
-        ///            public_key: AddressOrHexKey::Address(Address::from_slice(
-        ///                &hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap()
-        ///            ))
-        ///        }
+        ///        network: Network::Mainnet,
+        ///        account: Account::Address(Address::from_slice(
+        ///            &hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap()
+        ///        ))
         ///   });
         /// ```
         pub rule ethr_did() -> Did

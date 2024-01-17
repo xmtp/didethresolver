@@ -103,13 +103,14 @@ pub async fn test_delegate() -> Result<()> {
         did.send().await?.await?;
 
         let document = client.resolve_did(hex::encode(me)).await?;
-        validate_document(&document).await;
+        println!("this this docu{:?}", document.verification_method[0].id);
 
+        validate_document(&document).await;
+        
         assert_eq!(
             document.verification_method[0].id,
             DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
-        );
-        assert_eq!(
+        );        assert_eq!(
             document.verification_method[0].controller,
             DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
         );

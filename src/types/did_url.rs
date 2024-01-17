@@ -13,9 +13,9 @@ use super::parse_ethr_did;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DidUrl {
     pub did: Did,
-    path: String,
-    query: Option<String>,
-    fragment: Option<String>,
+    pub path: String,
+    pub query: Option<String>,
+    pub fragment: Option<String>,
 }
 
 /// The `id` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL. returned by [`parse_ethr_did`]
@@ -207,9 +207,9 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// use didethresolver::types::{ChainId, DidUrl};
+    /// use didethresolver::types::{Network, DidUrl};
     /// let did_url = DidUrl::parse("did:ethr:0x01:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-    /// assert_eq!(did_url.chain_id(), &ChainId::Mainnet);
+    /// assert_eq!(did_url.network(), &Network::Mainnet);
     /// ```
     ///
     pub fn network(&self) -> &Network {
@@ -223,12 +223,12 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// use didethresolver::types::{AddressOrHexKey, DidUrl};
+    /// use didethresolver::types::{Account, DidUrl};
     /// use ethers::types::Address;
     ///
     /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// let address = hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-    /// assert_eq!(did_url.id(), &AddressOrHexKey::Address(Address::from_slice(address.as_slice())));
+    /// assert_eq!(did_url.account(), &Account::Address(Address::from_slice(address.as_slice())));
     /// ```
     ///
     pub fn account(&self) -> &Account {
@@ -272,7 +272,7 @@ impl DidUrl {
     ///
     /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// did_url.set_fragment(Some("controller"));
-    /// assert_eq!(did_url.as_str(), "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller");
+    /// assert_eq!(did_url.fragment(), Some("controller"));
     /// ```
     pub fn set_fragment(&mut self, fragment: Option<&str>) {
         // replace the fragment
@@ -293,8 +293,8 @@ impl DidUrl {
     /// use didethresolver::types::DidUrl;
     ///
     /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-    /// did_url.set_path("ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
-    /// assert_eq!(did_url.as_str(), "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
+    /// did_url.set_path("/path/to/resource");
+    /// assert_eq!(did_url.path, "/path/to/resource");
     /// ```
     ///
     /// # Errors
@@ -311,7 +311,14 @@ impl DidUrl {
 
 impl ToString for DidUrl {
     fn to_string(&self) -> String {
-        format!("{}{}", self.did.to_string(), self.path())
+        let mut string = format!("{}{}", self.did.to_string(), self.path());
+        if let Some(query) = self.query() {
+            string = format!("{}?{}", string, query);
+        }
+        if let Some(fragment) = self.fragment() {
+            string = format!("{}#{}", string, fragment);
+        }
+        string
     }
 }
 
