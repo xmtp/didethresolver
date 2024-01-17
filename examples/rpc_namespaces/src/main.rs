@@ -4,7 +4,7 @@
 //!
 //! All did methods will be available under the `did_` namespace, all turtle methods under the `turtle_` namespace.
 //!
-//! Try running this example and executing the command `curl -H "Content-Type: application/json" -d '{"id":1, "jsonrpc":"2.0", "method": "rpc_methods"}' http://localhost:PORT/` | jq .result
+//! Try running this example and executing the command `curl -H "Content-Type: application/json" -d '{"id":1, "jsonrpc":"2.0", "method": "rpc_methods"}' http://localhost:9999/` | jq .result
 //! (requires `curl` and `jq` packages to be installed)
 
 use std::str::FromStr;
@@ -25,9 +25,7 @@ pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let server = Server::builder().build("127.0.0.1:0").await?;
-
-    let addr = server.local_addr()?;
+    let server = Server::builder().build("127.0.0.1:9999").await?;
 
     let mut methods = RpcModule::new(());
     // add the turtle RPC namespace
@@ -49,7 +47,7 @@ async fn main() -> Result<()> {
     let methods = build_rpc_api(methods);
     let handle = server.start(methods);
 
-    println!("Listening on: {}", addr);
+    println!("Listening on: 127.0.0.1:9999");
 
     handle.stopped().await;
 
