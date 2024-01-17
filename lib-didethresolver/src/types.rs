@@ -136,7 +136,7 @@ pub enum VerificationMethodProperties {
 
 /// Represents different types of services associated with a DID.
 /// Currently, only [`ServiceType::Messaging`] is directly supported
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ServiceType {
     /// Specific serice type for messaging
     #[serde(rename = "MessagingService")]
@@ -146,7 +146,7 @@ pub enum ServiceType {
 }
 
 /// Various cryptographic key types defined in the [DID Specification](https://www.w3.org/TR/did-spec-registries/#verification-method-types)
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum KeyType {
     JsonWebKey2020,
     Ed25519VerificationKey2020,
@@ -169,7 +169,7 @@ impl From<KeyType> for String {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KeyPurpose {
     VerificationKey,
     SignatureAuthentication,
@@ -197,7 +197,7 @@ impl From<KeyEncoding> for String {
 }
 
 /// A parsed did:ethr did:ethr attribute name value, returned from [`parse_attribute`]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Attribute {
     PublicKey(PublicKey),
     Service(ServiceType),
@@ -205,7 +205,7 @@ pub enum Attribute {
 }
 
 /// Indicates the encoding of a key in a did:ethr attribute
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum KeyEncoding {
     Hex,
     Base64,
@@ -213,14 +213,14 @@ pub enum KeyEncoding {
 }
 
 /// Indicates the Public Key Type, Purpose, and Encoding from a did:ethr attribute name
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PublicKey {
     pub key_type: KeyType,
     pub purpose: KeyPurpose,
     pub encoding: KeyEncoding,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, Eq)]
 pub struct DidDocumentMetadata {
     #[serde(default, rename = "deactivated")]
     pub deactivated: bool,
@@ -250,17 +250,10 @@ pub struct DidResolutionMetadata {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DidResolutionResult {
-    #[serde(
-        default,
-        rename = "didDocumentMetadata",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub metadata: Option<DidDocumentMetadata>,
-    #[serde(
-        rename = "didResolutionMetadata",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub resolution_metadata: Option<DidResolutionMetadata>,
+    #[serde(default, rename = "didDocumentMetadata")]
+    pub metadata: DidDocumentMetadata,
+    #[serde(rename = "didResolutionMetadata")]
+    pub resolution_metadata: DidResolutionMetadata,
     #[serde(rename = "didDocument")]
     pub document: DidDocument,
 }
@@ -340,7 +333,7 @@ mod test {
                         }
                     ),
                 }],
-                ..DidDocument::ethr_builder().build()
+                ..DidDocument::ethr_builder().build().unwrap()
             }
         );
         assert_eq!(serde_json::to_value(doc).unwrap(), sample_did);
