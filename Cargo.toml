@@ -1,7 +1,8 @@
 [workspace]
 members = [
   "lib-didethresolver",
-  "didethresolver-gateway"
+  "didethresolver-gateway",
+   "examples/*"
 ]
 
 exclude = [ ]
@@ -18,4 +19,6 @@ async-trait = "0.1"
 chrono = "0.4.31"
 ethers = "2"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0.79"
 

@@ -27,4 +27,3 @@ pub trait DidRegistry {
         version_id: Option<String>,
     ) -> Result<DidResolutionResult, ErrorObjectOwned>;
 }
-
