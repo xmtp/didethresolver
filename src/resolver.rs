@@ -93,7 +93,6 @@ impl Resolver {
         public_key: H160,
         event: DIDRegistryEvents,
         meta: LogMeta,
-        deactivated: &mut bool,
     ) {
         let res = match event {
             DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
@@ -103,13 +102,7 @@ impl Resolver {
                 doc.attribute_event(attribute_event)
             }
             DIDRegistryEvents::DidownerChangedFilter(owner_changed) => {
-                if doc
-                    .owner_event(owner_changed)
-                    .is_ok_and(|deactivated| deactivated)
-                {
-                    *deactivated = true;
-                }
-                Ok(())
+                doc.owner_event(owner_changed)
             }
         };
 
@@ -143,7 +136,6 @@ impl Resolver {
 
         base_document.now(now);
         let mut last_updated_did_version_id: Option<U64> = None;
-        let mut deactivated = false;
 
         for (event, meta) in history {
             let LogMeta { block_number, .. } = meta;
@@ -151,14 +143,7 @@ impl Resolver {
             if version_id.unwrap_or_default() > U64::zero() {
                 if meta.block_number <= version_id.unwrap_or_default() {
                     // 1. delegate events
-                    Resolver::dispatch_event(
-                        self,
-                        &mut base_document,
-                        public_key,
-                        event,
-                        meta,
-                        &mut deactivated,
-                    );
+                    Resolver::dispatch_event(self, &mut base_document, public_key, event, meta);
                     // 2. set latest version
                     if current_version_id < block_number {
                         current_version_id = block_number;
@@ -170,21 +155,13 @@ impl Resolver {
                 }
             } else {
                 // 1. delegate events
-                Resolver::dispatch_event(
-                    self,
-                    &mut base_document,
-                    public_key,
-                    event,
-                    meta,
-                    &mut deactivated,
-                );
+                Resolver::dispatch_event(self, &mut base_document, public_key, event, meta);
                 // 2. set latest version
                 if current_version_id < block_number {
                     current_version_id = block_number;
                 }
             };
         }
-
         let block_time = |block: Block<H256>| {
             block
                 .time()
@@ -201,9 +178,8 @@ impl Resolver {
             .map(block_time);
 
         let resolution_result = DidResolutionResult {
-            document: base_document.build(),
-            metadata: Some(DidDocumentMetadata {
-                deactivated,
+            metadata: DidDocumentMetadata {
+                deactivated: base_document.is_deactivated(),
                 version_id: current_version_id.as_u64(),
                 updated: current_version_timestamp,
                 next_version_id: last_updated_did_version_id.map(|ver| ver.as_u64()),
@@ -211,10 +187,11 @@ impl Resolver {
                     Some(ver) => self.signer.get_block(ver).await?.map(block_time),
                     None => None::<String>,
                 },
-            }),
-            resolution_metadata: Some(DidResolutionMetadata {
+            },
+            document: base_document.build()?,
+            resolution_metadata: DidResolutionMetadata {
                 content_type: "application/did+ld+json".to_string(),
-            }),
+            },
         };
         Ok(resolution_result)
     }

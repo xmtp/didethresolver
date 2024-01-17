@@ -1,17 +1,19 @@
 mod integration_util;
 
+use std::str::FromStr;
+
 use anyhow::Result;
 use didethresolver::{
     rpc::DidRegistryClient,
-    types::{DidUrl, KeyType, VerificationMethodProperties},
+    types::{DidUrl, KeyType, VerificationMethodProperties, NULL_ADDRESS},
 };
 use ethers::{
     signers::{LocalWallet, Signer as _},
-    types::U256,
+    types::{Address, U256},
 };
 use integration_util::{validate_document, with_client};
 
-//TODO: Add tests for: Errors, formats, entire document asserts, different padding methods(0s and spaces)
+//TODO: Add tests for: Errors, formats, entire document asserts
 
 #[tokio::test]
 pub async fn test_attributes() -> Result<()> {
@@ -36,28 +38,8 @@ pub async fn test_attributes() -> Result<()> {
         let resolution_response = client.resolve_did(hex::encode(me), None).await?;
         validate_document(&resolution_response.document).await;
         assert_eq!(
-            resolution_response.document.verification_method[0].id,
-            DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
-        );
-        assert_eq!(
-            resolution_response.document.verification_method[0].controller,
-            DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
-        );
-        assert_eq!(
-            resolution_response.document.verification_method[0].verification_type,
-            KeyType::EcdsaSecp256k1VerificationKey2019
-        );
-        assert_eq!(
-            resolution_response.document.verification_method[0].verification_properties,
-            Some(VerificationMethodProperties::PublicKeyHex {
-                public_key_hex:
-                    "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".to_string()
-            })
-        );
-
-        assert_eq!(
             resolution_response.document.verification_method[1].id,
-            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+            DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
         );
         assert_eq!(
             resolution_response.document.verification_method[1].controller,
@@ -65,25 +47,45 @@ pub async fn test_attributes() -> Result<()> {
         );
         assert_eq!(
             resolution_response.document.verification_method[1].verification_type,
-            KeyType::Ed25519VerificationKey2020
+            KeyType::EcdsaSecp256k1VerificationKey2019
         );
         assert_eq!(
             resolution_response.document.verification_method[1].verification_properties,
+            Some(VerificationMethodProperties::PublicKeyHex {
+                public_key_hex:
+                    "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".to_string()
+            })
+        );
+
+        assert_eq!(
+            resolution_response.document.verification_method[2].id,
+            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+        );
+        assert_eq!(
+            resolution_response.document.verification_method[2].controller,
+            DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
+        );
+        assert_eq!(
+            resolution_response.document.verification_method[2].verification_type,
+            KeyType::Ed25519VerificationKey2020
+        );
+        assert_eq!(
+            resolution_response.document.verification_method[2].verification_properties,
             Some(VerificationMethodProperties::PublicKeyBase64 {
                 public_key_base64: "MCowBQYDK2VuAyEAEYVXd3/7B4d0NxpSsA/tdVYdz5deYcR1U+ZkphdmEFI="
                     .to_string()
             })
         );
         assert_eq!(
-            resolution_response.metadata.clone().unwrap().deactivated,
+            resolution_response.metadata.clone().deactivated,
             false
         );
         assert_eq!(
-            resolution_response.metadata.clone().unwrap().version_id,
+            resolution_response.metadata.clone().version_id,
             3
         );
         assert_eq!(
-            resolution_response.metadata.unwrap().next_version_id,
+            resolution_response.metadata.next_version_id,
             None
         );
 
@@ -116,15 +118,15 @@ pub async fn test_attributes_versions() -> Result<()> {
         validate_document(&resolution_response.document).await;
 
         assert_eq!(
-            resolution_response.metadata.clone().unwrap().deactivated,
+            resolution_response.metadata.clone().deactivated,
             false
         );
         assert_eq!(
-            resolution_response.metadata.clone().unwrap().version_id,
+            resolution_response.metadata.clone().version_id,
             2
         );
         assert_eq!(
-            resolution_response.metadata.unwrap().next_version_id,
+            resolution_response.metadata.next_version_id,
             Some::<u64>(3)
         );
 
@@ -158,15 +160,15 @@ pub async fn test_delegate() -> Result<()> {
         validate_document(&resolution_response.document).await;
 
         assert_eq!(
-            resolution_response.document.verification_method[0].id,
+            resolution_response.document.verification_method[1].id,
             DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
         );
         assert_eq!(
-            resolution_response.document.verification_method[0].controller,
+            resolution_response.document.verification_method[1].controller,
             DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
         );
         assert_eq!(
-            resolution_response.document.verification_method[0].verification_properties,
+            resolution_response.document.verification_method[1].verification_properties,
             Some(VerificationMethodProperties::BlockchainAccountId {
                 blockchain_account_id: format!("0x{}", hex::encode(delegate.address()))
             })
@@ -194,6 +196,100 @@ pub async fn test_owner_changed() -> Result<()> {
                 DidUrl::parse(format!("did:ethr:0x{}", hex::encode(new_owner.address()))).unwrap()
             )
         );
+        Ok(())
+    })
+    .await
+}
+
+#[tokio::test]
+pub async fn test_attribute_revocation() -> Result<()> {
+    with_client(None, |client, registry, signer, _| async move {
+        let me = signer.address();
+        let did = registry.set_attribute(
+            me,
+            *b"did/pub/Secp256k1/veriKey/hex   ",
+            b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            U256::from(604_800),
+        );
+        did.send().await?.await?;
+
+        let did = registry.revoke_attribute(
+            me,
+            *b"did/pub/Secp256k1/veriKey/hex   ",
+            b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+        );
+        did.send().await?.await?;
+
+        let document = client.resolve_did(hex::encode(me), None).await?.document;
+        validate_document(&document).await;
+
+        assert_eq!(
+            document.verification_method[0].id,
+            DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
+        );
+        assert_eq!(document.verification_method.len(), 1);
+
+        Ok(())
+    })
+    .await
+}
+
+#[tokio::test]
+pub async fn test_delegate_revocation() -> Result<()> {
+    with_client(None, |client, registry, signer, anvil| async move {
+        let me = signer.address();
+        let delegate: LocalWallet = anvil.keys()[4].clone().into();
+        let did = registry.add_delegate(
+            me,
+            *b"sigAuth                         ",
+            delegate.address(),
+            U256::from(604_800),
+        );
+        did.send().await?.await?;
+        let did = registry.add_delegate(
+            me,
+            *b"veriKey                         ",
+            delegate.address(),
+            U256::from(604_800),
+        );
+        did.send().await?.await?;
+
+        let did =
+            registry.revoke_delegate(me, *b"sigAuth0000000000000000000000000", delegate.address());
+        did.send().await?.await?;
+
+        let document = client.resolve_did(hex::encode(me), None).await?.document;
+        validate_document(&document).await;
+
+        assert_eq!(
+            document.verification_method[0].id,
+            DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
+        );
+        // delegate 1, veriKey should still be valid after revoking delegate 0
+        assert_eq!(
+            document.verification_method[1].id,
+            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+        );
+        assert_eq!(document.verification_method.len(), 2);
+
+        Ok(())
+    })
+    .await
+}
+
+#[tokio::test]
+pub async fn test_owner_revocation() -> Result<()> {
+    with_client(None, |client, registry, signer, _| async move {
+        let me = signer.address();
+        let null = Address::from_str(NULL_ADDRESS.strip_prefix("0x").unwrap()).unwrap();
+        let did = registry.change_owner(me, null);
+        did.send().await?.await?;
+
+        let resolved = client.resolve_did(hex::encode(me), None).await?;
+        validate_document(&resolved.document).await;
+
+        assert!(resolved.metadata.deactivated);
+
         Ok(())
     })
     .await
