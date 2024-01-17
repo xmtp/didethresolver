@@ -3,7 +3,7 @@
 #[cfg(test)]
 use std::sync::Once;
 
-#[cfg(all(test))]
+#[cfg(test)]
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
 #[cfg(test)]

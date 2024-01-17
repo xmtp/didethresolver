@@ -12,4 +12,4 @@ tokio.workspace = true
 anyhow.workspace = true
 serde_json.workspace = true
 ethers = { workspace = true, features = ["ws"] }
-lib-didethresolver = { path = "../../lib-didethresolver" }
+lib-didethresolver = { path = "../../lib-didethresolver", features = ["server"] }
