@@ -6,7 +6,10 @@ use thiserror::Error;
 pub enum ResolverError<M: Middleware> {
     #[error(transparent)]
     Builder(#[from] EthrBuilderError),
+    #[error(transparent)]
     ContractError(#[from] ContractError<M>),
+    #[error("{0}")]
+    Middleware(String),
 }
 
 #[derive(Error, Debug)]
@@ -32,7 +35,7 @@ impl<M: Middleware> From<ResolverError<M>> for ErrorObjectOwned {
         ErrorObjectOwned::owned(-31000, err.to_string(), None::<()>)
     }
 }
-
+/*
 impl<M: Middleware> std::fmt::Display for ResolverError<M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -43,6 +46,12 @@ impl<M: Middleware> std::fmt::Display for ResolverError<M> {
                 ContractError::MiddlewareError { .. } => write!(f, "{}", "Middleware Error"),
                 e => write!(f, "{}", e),
             },
+            ResolverError::Middleware(e) => write!(f, "{}", e),
         }
     }
+}
+*/
+
+pub fn into_error<M: Middleware>(err: ResolverError<M>) -> ResolverError<M> {
+    ResolverError::Middleware(err.to_string())
 }

@@ -49,8 +49,7 @@ impl<M: Middleware + 'static> Resolver<M> {
             .registry
             .changed(public_key)
             .call()
-            .await
-            .unwrap()
+            .await?
             .as_u64()
             .into();
 
@@ -68,8 +67,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                 .to_block(previous_change)
                 .topic1(H256::from(public_key))
                 .query_with_meta()
-                .await
-                .unwrap();
+                .await?;
 
             for (event, meta) in events {
                 if event.previous_change() < previous_change {
@@ -131,8 +129,16 @@ impl<M: Middleware + 'static> Resolver<M> {
         let mut base_document = DidDocument::ethr_builder();
         base_document.public_key(&public_key)?;
 
-        let current_block = self.signer.get_block_number().await.unwrap();
-        let current_block = self.signer.get_block(current_block).await.unwrap();
+        let current_block = self
+            .signer
+            .get_block_number()
+            .await
+            .map_err(|e| ResolverError::Middleware(e.to_string()))?;
+        let current_block = self
+            .signer
+            .get_block(current_block)
+            .await
+            .map_err(|e| ResolverError::Middleware(e.to_string()))?;
 
         let now = current_block.map(|b| b.timestamp).unwrap_or(U256::zero());
         let mut current_version_id = U64::zero();
@@ -194,7 +200,7 @@ impl<M: Middleware + 'static> Resolver<M> {
             .signer
             .get_block(current_version_id)
             .await
-            .unwrap()
+            .map_err(|e| ResolverError::Middleware(e.to_string()))?
             .map(block_time);
 
         let resolution_result = DidResolutionResult {
@@ -205,7 +211,12 @@ impl<M: Middleware + 'static> Resolver<M> {
                 updated: current_version_timestamp,
                 next_version_id: last_updated_did_version_id.map(|ver| ver.as_u64()),
                 next_update: match last_updated_did_version_id {
-                    Some(ver) => self.signer.get_block(ver).await.unwrap().map(block_time),
+                    Some(ver) => self
+                        .signer
+                        .get_block(ver)
+                        .await
+                        .map_err(|e| ResolverError::Middleware(e.to_string()))
+                        .map(block_time),
                     None => None::<String>,
                 },
             }),
