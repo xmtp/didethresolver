@@ -3,7 +3,7 @@ mod integration_util;
 use std::str::FromStr;
 
 use anyhow::Result;
-use didethresolver::{
+use lib_didethresolver::{
     rpc::DidRegistryClient,
     types::{DidUrl, KeyType, VerificationMethodProperties, NULL_ADDRESS},
 };

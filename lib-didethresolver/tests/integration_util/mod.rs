@@ -6,9 +6,6 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 
 // TODO: Would be nice to use the anvil library instead of a CLI interface
 use anyhow::Result;
-use didethresolver::{
-    did_registry::DIDRegistry, types::DidDocument, DidRegistryMethods, DidRegistryServer, Resolver,
-};
 use ethers::{
     core::utils::{Anvil, AnvilInstance},
     middleware::SignerMiddleware,
@@ -20,6 +17,10 @@ use futures::future::FutureExt;
 use jsonrpsee::{
     server::Server,
     ws_client::{WsClient, WsClientBuilder},
+};
+use lib_didethresolver::{
+    did_registry::DIDRegistry, rpc::DidRegistryMethods, types::DidDocument, DidRegistryServer,
+    Resolver,
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::timeout as timeout_tokio;
