@@ -11,7 +11,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::{
-    AddressOrHexKey, Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey,
+    Account, Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey,
     Service, ServiceType, VerificationMethod, VerificationMethodProperties,
 };
 use crate::{
@@ -338,7 +338,7 @@ impl EthrBuilder {
 
         // if we are resolving for a key that is a public key which matches the id, we need to add
         // another `controllerKey` verification method
-        if let AddressOrHexKey::HexKey(_) = self.id.id() {
+        if let Account::HexKey(_) = self.id.account() {
             let mut controller_key = self.id.clone();
             controller_key.set_fragment(Some("controllerKey"));
             self.verification_method.push(VerificationMethod {
@@ -875,6 +875,19 @@ mod tests {
         assert_eq!(
             builder.controller,
             Some(DidUrl::parse("did:ethr:0x0000000000000000000000000000000000000000").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_also_known_as() {
+        let identity = address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff");
+        let other = DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f").unwrap();
+        let mut builder = EthrBuilder::default();
+        builder.also_known_as(&other);
+        builder.now(U256::zero());
+        assert_eq!(
+            builder.also_known_as[0],
+            other
         );
     }
 }
