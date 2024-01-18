@@ -357,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn test_id() {
+    fn test_account() {
         let account = Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
 
         assert_eq!(
@@ -402,5 +402,50 @@ mod tests {
                 .account(),
             &account
         );
+    }
+
+    #[test]
+    fn test_network() {
+        assert_eq!(
+            DidUrl::parse("did:ethr:goerli:0xb9c5714089478a327f09197987f16f9e5d936e8a")
+            .unwrap()
+            .network(),
+            &Network::Goerli
+        );
+
+        assert_eq!(
+            DidUrl::parse("did:ethr:sepolia:0xb9c5714089478a327f09197987f16f9e5d936e8a")
+                .unwrap()
+                .network(),
+            &Network::Sepolia
+        );
+
+        assert_eq!(
+            DidUrl::parse("did:ethr:0x1a1:0xb9c5714089478a327f09197987f16f9e5d936e8a")
+                .unwrap()
+                .network(),
+            &Network::Other(0x1a1)
+        );
+    }
+
+    #[test]
+    fn test_set_fragment() {
+        let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#key-1").unwrap();
+        assert_eq!(did_url.fragment(), Some("key-1"));
+
+        did_url.set_fragment(Some("key-2"));
+        assert_eq!(did_url.fragment(), Some("key-2"));
+
+        did_url.set_fragment(None);
+        assert_eq!(did_url.fragment(), None);
+    }
+
+    #[test]
+    fn test_set_path() {
+        let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        assert_eq!(did_url.path(), "");
+
+        did_url.set_path("path-2");
+        assert_eq!(did_url.path(), "path-2");
     }
 }
