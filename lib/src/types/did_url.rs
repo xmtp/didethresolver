@@ -12,41 +12,49 @@ use crate::error::DidError;
 /// Currently only supports did:ethr: [did-ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DidUrl {
-    url: Url,
-    method_and_id: MethodAndId,
+    pub did: Did,
+    pub path: String,
+    pub query: Option<String>,
+    pub fragment: Option<String>,
 }
 
-/// The `method` and `id` parts of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL, returned by [`parse_ethr_did`]
+/// The `did` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL. returned by [`parse_ethr_did`]
 #[derive(Debug, Clone, PartialEq, Eq, SmartDefault)]
-pub struct MethodAndId {
+pub struct Did {
     pub method: Method,
-    pub id: Id,
+    pub network: Network,
+    pub account: Account,
 }
+
+impl ToString for Did {
+    fn to_string(&self) -> String {
+        format!(
+            "did:{}:{}:{}",
+            self.method.as_str(),
+            self.network.to_string().as_str(),
+            self.account.to_string().as_str()
+        )
+    }
+}
+
 // TODO: Could read a map of ChainId -> Provider from a configuration file or environment variable
 // (not in didurl parser though)
 
-/// The `id` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Id {
-    pub chain: ChainId,
-    pub public_key: AddressOrHexKey,
-}
-
-/// The `public_key` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) Url.
-/// A did:ethr URL may contain either a [`AddressOrHexKey::Address`] or [`AddressOrHexKey::HexKey`].
+/// The `ethereum-address / public-key-hex` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#method-specific-identifier) Url.
+/// A did:ethr URL may contain either a [`Account::Address`] or [`Account::HexKey`].
 #[derive(Debug, Clone, PartialEq, Eq, SmartDefault)]
-pub enum AddressOrHexKey {
+pub enum Account {
     Address(Address),
     // the default is an empty hex key
     #[default]
     HexKey(Vec<u8>),
 }
 
-impl ToString for AddressOrHexKey {
+impl ToString for Account {
     fn to_string(&self) -> String {
         match self {
-            AddressOrHexKey::Address(addr) => format!("0x{}", hex::encode(addr.as_bytes())),
-            AddressOrHexKey::HexKey(key) => format!("0x{}", hex::encode(key)),
+            Account::Address(addr) => format!("0x{}", hex::encode(addr.as_bytes())),
+            Account::HexKey(key) => format!("0x{}", hex::encode(key)),
         }
     }
 }
@@ -57,8 +65,16 @@ pub enum Method {
     Ethr,
 }
 
+impl Method {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Method::Ethr => "ethr",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, SmartDefault)]
-pub enum ChainId {
+pub enum Network {
     #[default]
     Mainnet,
     // here for possible backwards compatibility, but should error on creation of any new DID's
@@ -68,16 +84,28 @@ pub enum ChainId {
     Other(usize),
 }
 
-impl<'a> From<&'a str> for ChainId {
-    fn from(digits: &'a str) -> ChainId {
-        let num = usize::from_str_radix(digits, 16).expect("String must be valid Hex");
-
-        match num {
-            1 => ChainId::Mainnet,
+impl ToString for Network {
+    fn to_string(&self) -> String {
+        match self {
+            Network::Mainnet => "mainnet".to_string(),
             #[allow(deprecated)]
-            5 => ChainId::Goerli,
-            11155111 => ChainId::Sepolia,
-            _ => ChainId::Other(num),
+            Network::Goerli => "goerli".to_string(),
+            Network::Sepolia => "sepolia".to_string(),
+            Network::Other(num) => num.to_string(),
+        }
+    }
+}
+
+impl<'a> From<&'a str> for Network {
+    fn from(chain_id: &'a str) -> Network {
+        let chain_id = usize::from_str_radix(chain_id, 16).expect("String must be valid Hex");
+
+        match chain_id {
+            1 => Network::Mainnet,
+            #[allow(deprecated)]
+            5 => Network::Goerli,
+            11155111 => Network::Sepolia,
+            _ => Network::Other(chain_id),
         }
     }
 }
@@ -101,7 +129,7 @@ impl DidUrl {
     ///
     /// let did_url = "did:not:123";
     /// let did_url = DidUrl::parse(did_url).unwrap_err();
-    /// assert_eq!(did_url.to_string(), "Parsing of ethr:did failed, error at 1:1: expected one of \"ethr:\", the only supported method is `ethr`");
+    /// assert_eq!(did_url.to_string(), "Parsing of ethr:did failed, error at 1:1: expected one of \"ethr\", the only supported method is `ethr`");
     /// ```
     /// ```
     /// use lib_didethresolver::types::DidUrl;
@@ -117,20 +145,30 @@ impl DidUrl {
     pub fn parse<S: AsRef<str>>(input: S) -> Result<Self, DidError> {
         let url = Url::parse(input.as_ref())?;
 
-        let mut path = url.path().split('/');
-
-        let method_and_id = if let Some(path) = path.next() {
-            log::debug!("Parsing method and id from path: {}", path);
-            Some(parse_ethr_did(path)?)
+        // Note that `url.path()` will return an incorrect path from did url
+        // For regular URL("http://w.a.b/path"), the it only returns the string from the first '/' (/path)
+        // But for did url, it incorrectly returns the content before the first '/' (ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a/path)
+        let mut split = url.path().split('/');
+        let did = if let Some(did_str) = split.next() {
+            log::debug!("Parsing did from str: {}", did_str);
+            Some(parse_ethr_did(did_str)?)
         } else {
             None
         };
+        // join the strings in the split with '/' as delimiter
+        let path = split.fold(String::new(), |mut acc, s| {
+            acc.push_str(format!("/{}", s).as_str());
+            acc
+        });
 
-        path.next().and_then(|p| parse_ethr_did(p).ok());
+        let query = url.query().map(|query| query.to_owned());
+        let fragment = url.fragment().map(|fragment| fragment.to_owned());
 
         Ok(Self {
-            url,
-            method_and_id: method_and_id.unwrap_or(Default::default()),
+            did: did.unwrap_or_default(),
+            path,
+            query,
+            fragment,
         })
     }
 
@@ -151,7 +189,7 @@ impl DidUrl {
     /// ```
     ///
     pub fn method(&self) -> &Method {
-        &self.method_and_id.method
+        &self.did.method
     }
 
     /// Retrieves the chainId for an DID:ETHR URL, as defined in the [did-ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md).
@@ -161,13 +199,13 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// use lib_didethresolver::types::{ChainId, DidUrl};
+    /// use lib_didethresolver::types::{Network, DidUrl};
     /// let did_url = DidUrl::parse("did:ethr:0x01:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-    /// assert_eq!(did_url.chain_id(), &ChainId::Mainnet);
+    /// assert_eq!(did_url.network(), &Network::Mainnet);
     /// ```
     ///
-    pub fn chain_id(&self) -> &ChainId {
-        &self.method_and_id.id.chain
+    pub fn network(&self) -> &Network {
+        &self.did.network
     }
 
     /// Retrieves the identity part from the DID URL, as defined in the [did-ethr spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)).
@@ -177,22 +215,31 @@ impl DidUrl {
     ///
     /// # Examples
     /// ```
-    /// use lib_didethresolver::types::{AddressOrHexKey, DidUrl};
+    /// use lib_didethresolver::types::{Account, DidUrl};
     /// use ethers::types::Address;
     ///
     /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// let address = hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-    /// assert_eq!(did_url.id(), &AddressOrHexKey::Address(Address::from_slice(address.as_slice())));
+    /// assert_eq!(did_url.account(), &Account::Address(Address::from_slice(address.as_slice())));
     /// ```
     ///
-    pub fn id(&self) -> &AddressOrHexKey {
-        &self.method_and_id.id.public_key
+    pub fn account(&self) -> &Account {
+        &self.did.account
+    }
+
+    /// Retrieves the path part from the DID URL, as defined in the [did-ethr spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)).
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn query(&self) -> Option<&str> {
+        self.query.as_deref()
     }
 
     /// Returns this DID's fragment identifier, if any.
     ///  A fragment is the part of the URL after the # symbol. The fragment is optional and, if present, contains a fragment identifier that identifies a secondary resource, such as a section heading of a document.
     ///
-    /// In a DID, a fragment may be used to reference a specific section or component within a DID document, such as
+    /// In a DID URL, a fragment may be used to reference a specific section or component within a DID document, such as
     /// a particular verification method or service endpoint.
     ///
     ///  # Examples
@@ -204,9 +251,8 @@ impl DidUrl {
     /// ```
     ///
     /// **Note**: the parser did not percent-encode this component, but the input may have been percent-encoded already.
-
     pub fn fragment(&self) -> Option<&str> {
-        self.url.fragment()
+        self.fragment.as_deref()
     }
 
     /// Change this DID's fragment identifier
@@ -218,17 +264,15 @@ impl DidUrl {
     ///
     /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
     /// did_url.set_fragment(Some("controller"));
-    /// assert_eq!(did_url.as_str(), "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller");
+    /// assert_eq!(did_url.fragment(), Some("controller"));
     /// ```
     pub fn set_fragment(&mut self, fragment: Option<&str>) {
-        self.url.set_fragment(fragment)
-    }
-
-    /// Return the serialization of this URL.
-    ///
-    /// This is fast since the serialization is already stored in the [`DidUrl`] struct.
-    pub fn as_str(&self) -> &str {
-        self.url.as_str()
+        // replace the fragment
+        if let Some(fragment) = fragment {
+            self.fragment = Some(fragment.to_string());
+        } else {
+            self.fragment = None;
+        }
     }
 
     /// Change this DID's path
@@ -241,21 +285,32 @@ impl DidUrl {
     /// use lib_didethresolver::types::DidUrl;
     ///
     /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-    /// did_url.set_path("ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
-    /// assert_eq!(did_url.as_str(), "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
+    /// did_url.set_path("/path/to/resource");
+    /// assert_eq!(did_url.path, "/path/to/resource");
     /// ```
     ///
     /// # Errors
     /// returns a [`DidError`] if the parsing of the URI fails because it is not the expected format or if the method is unsupported.
     ///
-    pub fn set_path(&mut self, path: &str) -> Result<(), DidError> {
-        self.url.set_path(path);
-        let mut path = self.url.path().split('/');
-        if let Some(path) = path.next() {
-            log::debug!("Parsing method and id from path: {}", path);
-            self.method_and_id = parse_ethr_did(path)?;
-        };
-        Ok(())
+    pub fn set_path(&mut self, path: &str) {
+        self.path = path.to_string();
+    }
+
+    pub fn set_account(&mut self, account: Account) {
+        self.did.account = account;
+    }
+}
+
+impl ToString for DidUrl {
+    fn to_string(&self) -> String {
+        let mut string = format!("{}{}", self.did.to_string(), self.path());
+        if let Some(query) = self.query() {
+            string = format!("{}?{}", string, query);
+        }
+        if let Some(fragment) = self.fragment() {
+            string = format!("{}#{}", string, fragment);
+        }
+        string
     }
 }
 
@@ -264,7 +319,8 @@ impl Serialize for DidUrl {
     where
         S: Serializer,
     {
-        let decoded = percent_encoding::percent_decode_str(self.url.as_str());
+        let binding = self.to_string();
+        let decoded = percent_encoding::percent_decode_str(binding.as_str());
         serializer.serialize_str(&decoded.decode_utf8_lossy())
     }
 }
@@ -295,57 +351,111 @@ mod tests {
 
         let err = DidUrl::parse("did:pkh:0x7e575682A8E450E33eB0493f9972821aE333cd7F").unwrap_err();
         assert_eq!(
-            "Parsing of ethr:did failed, error at 1:1: expected one of \"ethr:\", the only supported method is `ethr`"
+            "Parsing of ethr:did failed, error at 1:1: expected one of \"ethr\", the only supported method is `ethr`"
                 .to_string(),
             err.to_string()
         );
     }
 
     #[test]
-    fn test_id() {
-        let addr = AddressOrHexKey::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
+    fn test_account() {
+        let account = Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
 
         assert_eq!(
             DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a/path")
                 .unwrap()
-                .id(),
-            &addr,
+                .account(),
+            &account,
         );
         assert_eq!(
             DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a?versionId=1")
                 .unwrap()
-                .id(),
-            &addr
+                .account(),
+            &account
         );
         assert_eq!(
             DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#public-key-0")
                 .unwrap()
-                .id(),
-            &addr,
+                .account(),
+            &account,
         );
         assert_eq!(
             DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#agent")
                 .unwrap()
-                .id(),
-            &addr
+                .account(),
+            &account
         );
         assert_eq!(
             DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a?service=agent&relativeRef=/credentials#degree")
                 .unwrap()
-                .id(),
-            &addr
+                .account(),
+            &account
         );
         assert_eq!(
             DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a?versionTime=2021-05-10T17:00:00Z")
                 .unwrap()
-                .id(),
-            &addr
+                .account(),
+            &account
         );
         assert_eq!(
             DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a?service=files&relativeRef=/resume.pdf")
                 .unwrap()
-                .id(),
-            &addr
+                .account(),
+            &account
         );
+    }
+
+    #[test]
+    fn test_network() {
+        assert_eq!(
+            DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a")
+                .unwrap()
+                .network(),
+            &Network::Mainnet
+        );
+
+        assert_eq!(
+            DidUrl::parse("did:ethr:mainnet:0xb9c5714089478a327f09197987f16f9e5d936e8a")
+                .unwrap()
+                .network(),
+            &Network::Mainnet
+        );
+
+        assert_eq!(
+            DidUrl::parse("did:ethr:sepolia:0xb9c5714089478a327f09197987f16f9e5d936e8a")
+                .unwrap()
+                .network(),
+            &Network::Sepolia
+        );
+
+        assert_eq!(
+            DidUrl::parse("did:ethr:0x1a1:0xb9c5714089478a327f09197987f16f9e5d936e8a")
+                .unwrap()
+                .network(),
+            &Network::Other(0x1a1)
+        );
+    }
+
+    #[test]
+    fn test_set_fragment() {
+        let mut did_url =
+            DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#key-1").unwrap();
+        assert_eq!(did_url.fragment(), Some("key-1"));
+
+        did_url.set_fragment(Some("key-2"));
+        assert_eq!(did_url.fragment(), Some("key-2"));
+
+        did_url.set_fragment(None);
+        assert_eq!(did_url.fragment(), None);
+    }
+
+    #[test]
+    fn test_set_path() {
+        let mut did_url =
+            DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        assert_eq!(did_url.path(), "");
+
+        did_url.set_path("path-2");
+        assert_eq!(did_url.path(), "path-2");
     }
 }
