@@ -935,7 +935,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "didethresolver-gateway"
+name = "didethresolver"
 version = "0.1.0"
 dependencies = [
  "anyhow",
