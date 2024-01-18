@@ -18,7 +18,7 @@ pub struct DidUrl {
     pub fragment: Option<String>,
 }
 
-/// The `id` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL. returned by [`parse_ethr_did`]
+/// The `did` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL. returned by [`parse_ethr_did`]
 #[derive(Debug, Clone, PartialEq, Eq, SmartDefault)]
 pub struct Did {
     pub method: Method,
@@ -40,8 +40,8 @@ impl ToString for Did {
 // TODO: Could read a map of ChainId -> Provider from a configuration file or environment variable
 // (not in didurl parser though)
 
-/// The `public_key` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) Url.
-/// A did:ethr URL may contain either a [`AddressOrHexKey::Address`] or [`AddressOrHexKey::HexKey`].
+/// The `ethereum-address / public-key-hex` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#method-specific-identifier) Url.
+/// A did:ethr URL may contain either a [`Account::Address`] or [`Account::HexKey`].
 #[derive(Debug, Clone, PartialEq, Eq, SmartDefault)]
 pub enum Account {
     Address(Address),
@@ -160,17 +160,8 @@ impl DidUrl {
             acc
         });
 
-        let query = if let Some(query) = url.query() {
-            Some(query.to_owned())
-        } else {
-            None
-        };
-
-        let fragment = if let Some(fragment) = url.fragment() {
-            Some(fragment.to_owned())
-        } else {
-            None
-        };
+        let query = url.query().map(|query| query.to_owned());
+        let fragment = url.fragment().map(|fragment| fragment.to_owned());
 
         Ok(Self {
             did: did.unwrap_or_default(),

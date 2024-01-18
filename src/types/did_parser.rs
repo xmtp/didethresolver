@@ -219,18 +219,18 @@ mod tests {
             }
         );
 
-        // let parsed =
-        //     parse_ethr_did("ethr:0x01:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-        // assert_eq!(
-        //     parsed,
-        //     Did {
-        //         method: Method::Ethr,
-        //         network: Network::Mainnet,
-        //         account: Account::Address(Address::from_slice(
-        //             &hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap()
-        //         ))
-        //     }
-        // );
+        let parsed =
+            parse_ethr_did("ethr:0x01:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        assert_eq!(
+            parsed,
+            Did {
+                method: Method::Ethr,
+                network: Network::Mainnet,
+                account: Account::Address(Address::from_slice(
+                    &hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap()
+                ))
+            }
+        );
     }
 
     #[test]

@@ -37,9 +37,9 @@ impl Resolver {
         Ok(Self { signer, registry })
     }
 
-    pub async fn resolve_did(&self, public_key: H160) -> Result<DidDocument> {
-        let history = self.changelog(public_key).await?;
-        self.wrap_did_document(public_key, history).await
+    pub async fn resolve_did(&self, address: H160) -> Result<DidDocument> {
+        let history = self.changelog(address).await?;
+        self.wrap_did_document(address, history).await
     }
 
     async fn changelog(&self, public_key: H160) -> Result<Vec<(DIDRegistryEvents, LogMeta)>> {
