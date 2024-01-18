@@ -408,12 +408,20 @@ mod tests {
     #[test]
     fn test_network() {
         assert_eq!(
-            DidUrl::parse("did:ethr:goerli:0xb9c5714089478a327f09197987f16f9e5d936e8a")
+            DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a")
                 .unwrap()
                 .network(),
-            &Network::Goerli
+            &Network::Mainnet
         );
 
+        assert_eq!(
+            DidUrl::parse("did:ethr:mainnet:0xb9c5714089478a327f09197987f16f9e5d936e8a")
+                .unwrap()
+                .network(),
+            &Network::Mainnet
+        );
+        
+        
         assert_eq!(
             DidUrl::parse("did:ethr:sepolia:0xb9c5714089478a327f09197987f16f9e5d936e8a")
                 .unwrap()
