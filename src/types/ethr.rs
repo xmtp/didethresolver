@@ -11,8 +11,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::{
-    AddressOrHexKey, Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey,
-    Service, ServiceType, VerificationMethod, VerificationMethodProperties,
+    Account, Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey, Service,
+    ServiceType, VerificationMethod, VerificationMethodProperties,
 };
 use crate::{
     resolver::did_registry::{
@@ -96,7 +96,7 @@ impl EthrBuilder {
 
     /// set the identity of the document
     pub fn public_key(&mut self, key: &Address) -> Result<()> {
-        self.id.set_path(&format!("ethr:0x{}", hex::encode(key)))?;
+        self.id.set_account(types::Account::Address(*key));
         Ok(())
     }
 
@@ -108,7 +108,7 @@ impl EthrBuilder {
     /// Set the controller of the document
     pub fn controller(&mut self, controller: &Address) -> Result<()> {
         let mut did = self.id.clone();
-        did.set_path(&format!("ethr:0x{}", hex::encode(controller)))?;
+        did.set_account(types::Account::Address(*controller));
         self.controller = Some(did);
         Ok(())
     }
@@ -332,13 +332,13 @@ impl EthrBuilder {
             controller: self.id.clone(),
             verification_type: KeyType::EcdsaSecp256k1VerificationKey2019,
             verification_properties: Some(VerificationMethodProperties::BlockchainAccountId {
-                blockchain_account_id: self.id.id().to_string(),
+                blockchain_account_id: self.id.did.account.to_string(),
             }),
         });
 
         // if we are resolving for a key that is a public key which matches the id, we need to add
         // another `controllerKey` verification method
-        if let AddressOrHexKey::HexKey(_) = self.id.id() {
+        if let Account::HexKey(_) = self.id.account() {
             let mut controller_key = self.id.clone();
             controller_key.set_fragment(Some("controllerKey"));
             self.verification_method.push(VerificationMethod {
@@ -346,7 +346,7 @@ impl EthrBuilder {
                 controller: self.id.clone(),
                 verification_type: KeyType::EcdsaSecp256k1VerificationKey2019,
                 verification_properties: Some(VerificationMethodProperties::BlockchainAccountId {
-                    blockchain_account_id: self.id.id().to_string(),
+                    blockchain_account_id: self.id.did.account.to_string(),
                 }),
             });
             self.authentication.push(controller_key.clone());
@@ -693,11 +693,15 @@ mod tests {
         assert_eq!(
             doc.verification_method[1],
             VerificationMethod {
-                id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
-                    .unwrap(),
+                id: DidUrl::parse(
+                    "did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0"
+                )
+                .unwrap(),
                 verification_type: KeyType::EcdsaSecp256k1RecoveryMethod2020,
-                controller: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f")
-                    .unwrap(),
+                controller: DidUrl::parse(
+                    "did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f"
+                )
+                .unwrap(),
                 verification_properties: Some(VerificationMethodProperties::BlockchainAccountId {
                     // TODO: Handle chain_id
                     blockchain_account_id: "0xfc88f377218e665d8ede610034c4ab2b81e5f9ff".into()
@@ -708,8 +712,10 @@ mod tests {
         assert_eq!(
             doc.verification_method[2],
             VerificationMethod {
-                id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1")
-                    .unwrap(),
+                id: DidUrl::parse(
+                    "did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1"
+                )
+                .unwrap(),
                 verification_type: KeyType::EcdsaSecp256k1RecoveryMethod2020,
                 controller: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f")
                     .unwrap(),
@@ -721,12 +727,12 @@ mod tests {
         );
 
         assert_eq!(
-            DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
+            DidUrl::parse("did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
                 .unwrap(),
             doc.assertion_method[0]
         );
         assert_eq!(
-            DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1")
+            DidUrl::parse("did:ethr:mainnet:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-1")
                 .unwrap(),
             doc.authentication[0]
         );
@@ -870,5 +876,15 @@ mod tests {
             builder.controller,
             Some(DidUrl::parse("did:ethr:0x0000000000000000000000000000000000000000").unwrap())
         );
+    }
+
+    #[test]
+    fn test_also_known_as() {
+        let identity = address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff");
+        let other = DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f").unwrap();
+        let mut builder = EthrBuilder::default();
+        builder.also_known_as(&other);
+        builder.now(U256::zero());
+        assert_eq!(builder.also_known_as[0], other);
     }
 }
