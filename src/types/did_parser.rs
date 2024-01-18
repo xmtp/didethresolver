@@ -39,8 +39,7 @@ peg::parser! {
             // named networks
             / "mainnet:" { Network::Mainnet }
             / "sepolia:" { Network::Sepolia }
-            / "goerli:" { Network::Goerli }
-            / expected!("the only supported networks are `mainnet`, `goerli`, `sepolia`, and chain id")
+            / expected!("the only supported networks are `mainnet`, `sepolia`, and chain id")
 
         rule account() -> Account
             = "0" i("x") digits:$(hex_digit()*<40>) { Account::Address(Address::from_slice(&hex::decode(digits).unwrap())) }

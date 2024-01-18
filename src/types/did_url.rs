@@ -88,6 +88,7 @@ impl ToString for Network {
     fn to_string(&self) -> String {
         match self {
             Network::Mainnet => "mainnet".to_string(),
+            #[allow(deprecated)]
             Network::Goerli => "goerli".to_string(),
             Network::Sepolia => "sepolia".to_string(),
             Network::Other(num) => num.to_string(),
