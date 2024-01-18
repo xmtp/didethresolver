@@ -420,8 +420,7 @@ mod tests {
                 .network(),
             &Network::Mainnet
         );
-        
-        
+
         assert_eq!(
             DidUrl::parse("did:ethr:sepolia:0xb9c5714089478a327f09197987f16f9e5d936e8a")
                 .unwrap()
