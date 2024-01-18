@@ -11,8 +11,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::{
-    Account, Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey,
-    Service, ServiceType, VerificationMethod, VerificationMethodProperties,
+    Account, Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey, Service,
+    ServiceType, VerificationMethod, VerificationMethodProperties,
 };
 use crate::{
     resolver::did_registry::{
@@ -885,9 +885,6 @@ mod tests {
         let mut builder = EthrBuilder::default();
         builder.also_known_as(&other);
         builder.now(U256::zero());
-        assert_eq!(
-            builder.also_known_as[0],
-            other
-        );
+        assert_eq!(builder.also_known_as[0], other);
     }
 }

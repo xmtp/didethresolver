@@ -408,8 +408,8 @@ mod tests {
     fn test_network() {
         assert_eq!(
             DidUrl::parse("did:ethr:goerli:0xb9c5714089478a327f09197987f16f9e5d936e8a")
-            .unwrap()
-            .network(),
+                .unwrap()
+                .network(),
             &Network::Goerli
         );
 
@@ -430,7 +430,8 @@ mod tests {
 
     #[test]
     fn test_set_fragment() {
-        let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#key-1").unwrap();
+        let mut did_url =
+            DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#key-1").unwrap();
         assert_eq!(did_url.fragment(), Some("key-1"));
 
         did_url.set_fragment(Some("key-2"));
@@ -442,7 +443,8 @@ mod tests {
 
     #[test]
     fn test_set_path() {
-        let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        let mut did_url =
+            DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
         assert_eq!(did_url.path(), "");
 
         did_url.set_path("path-2");
