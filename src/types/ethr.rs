@@ -286,6 +286,10 @@ impl EthrBuilder {
             KeyPurpose::Encryption => {
                 self.key_agreement.push(method.id.clone());
             }
+            KeyPurpose::Xmtp => {
+                self.authentication.push(method.id.clone());
+                method.id.set_query(Some("xmtp"));
+            }
         };
         Ok(())
     }

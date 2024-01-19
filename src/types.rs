@@ -174,6 +174,7 @@ pub enum KeyPurpose {
     VerificationKey,
     SignatureAuthentication,
     Encryption,
+    Xmtp,
 }
 
 impl From<KeyPurpose> for String {
@@ -182,6 +183,7 @@ impl From<KeyPurpose> for String {
             KeyPurpose::VerificationKey => "veriKey".into(),
             KeyPurpose::SignatureAuthentication => "sigAuth".into(),
             KeyPurpose::Encryption => "enc".into(),
+            KeyPurpose::Xmtp => "xmtp".into(),
         }
     }
 }

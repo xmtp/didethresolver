@@ -236,6 +236,15 @@ impl DidUrl {
         self.query.as_deref()
     }
 
+    pub fn set_query(&mut self, query: Option<&str>) {
+        // replace the query
+        if let Some(query) = query {
+            self.query = Some(query.to_string());
+        } else {
+            self.query = None;
+        }
+    }
+
     /// Returns this DID's fragment identifier, if any.
     ///  A fragment is the part of the URL after the # symbol. The fragment is optional and, if present, contains a fragment identifier that identifies a secondary resource, such as a section heading of a document.
     ///

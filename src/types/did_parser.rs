@@ -81,7 +81,7 @@ peg::parser! {
             = kt:(secp256k1() / ed25519() / rsa() / x25519() ) { kt }
 
         rule key_purpose() -> KeyPurpose
-            = i("veriKey") { KeyPurpose::VerificationKey } / "sigAuth" { KeyPurpose::SignatureAuthentication } / "enc" { KeyPurpose::Encryption }
+            = i("veriKey") { KeyPurpose::VerificationKey } / "sigAuth" { KeyPurpose::SignatureAuthentication } / "enc" { KeyPurpose::Encryption } / "xmtp" { KeyPurpose::Xmtp }
 
         rule encoding() -> KeyEncoding
             = i("hex") { KeyEncoding::Hex } / "base64" { KeyEncoding::Base64 } / "base58" { KeyEncoding::Base58 }
@@ -103,7 +103,7 @@ peg::parser! {
 
         /// Parses the DID attribute name value
         ///
-        /// Parses the `did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc)/(hex|base64|base58)` part of a DID attribute name for adding a public key,
+        /// Parses the `did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc|xmtp)/(hex|base64|base58)` part of a DID attribute name for adding a public key,
         /// or the `did/svc/[ServiceName]` part for adding a service
         pub rule attribute() -> Attribute
             = pk:public_key() {
@@ -181,6 +181,12 @@ mod tests {
             "did/pub/X25519/enc/hex",
             "did/pub/X25519/enc/base64",
             "did/pub/X25519/enc/base58",
+            "did/pub/ed25519/xmtp/hex",
+            "did/pub/x25519/xmtp/hex",
+            "did/pub/Secp256k1/xmtp/hex",
+            "did/pub/RSA/xmtp/hex",
+            "did/pub/ed25519/xmtp/base64",
+            "did/pub/ed25519/xmtp/base58",
             "did/svc/MessagingService",
         ];
 
