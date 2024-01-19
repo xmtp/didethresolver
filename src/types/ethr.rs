@@ -287,8 +287,8 @@ impl EthrBuilder {
                 self.key_agreement.push(method.id.clone());
             }
             KeyPurpose::Xmtp => {
-                self.authentication.push(method.id.clone());
                 method.id.set_query(Some("xmtp"));
+                self.authentication.push(method.id.clone());
             }
         };
         Ok(())
