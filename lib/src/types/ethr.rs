@@ -295,6 +295,7 @@ impl EthrBuilder {
                 method.id.append_path("xmtp");
                 match key.metadata {
                     Some(KeyMetadata::Installation) => {
+                        //TODO: Formalize XMTP metadata into typed enum
                         method.id.set_query("meta", Some("installation_key"))
                     }
                     _ => method.id.set_query("meta", None),
@@ -921,12 +922,15 @@ mod tests {
         }
 
         let doc = builder.build().unwrap();
-        /*
-                assert_eq!(
-                    doc.verification_method[1].id.fragment().unwrap(),
-                    "delegate-0"
-                );
-        */
-        println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+
+        assert_eq!(
+            doc.verification_method[1].id.fragment().unwrap(),
+            "delegate-0"
+        );
+        assert_eq!(
+            doc.verification_method[1].id.query().unwrap(),
+            "meta=installation_key"
+        );
+        assert_eq!(doc.verification_method[1].id.path(), "/xmtp");
     }
 }
