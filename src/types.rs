@@ -6,6 +6,7 @@ mod did_url;
 mod ethr;
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use url::Url;
 
 pub use did_parser::*;
@@ -145,6 +146,21 @@ pub enum ServiceType {
     Other(String),
 }
 
+impl fmt::Display for ServiceType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ServiceType::Messaging => write!(f, "MessagingService"),
+            ServiceType::Other(other) => write!(f, "{}", other),
+        }
+    }
+}
+
+impl From<ServiceType> for String {
+    fn from(t: ServiceType) -> Self {
+        t.to_string()
+    }
+}
+
 /// Various cryptographic key types defined in the [DID Specification](https://www.w3.org/TR/did-spec-registries/#verification-method-types)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum KeyType {
@@ -156,16 +172,22 @@ pub enum KeyType {
     X25519KeyAgreementKey2019,
 }
 
-impl From<KeyType> for String {
-    fn from(kt: KeyType) -> String {
-        match kt {
-            KeyType::JsonWebKey2020 => "jwk".into(),
-            KeyType::Ed25519VerificationKey2020 => "Ed25519".into(),
-            KeyType::EcdsaSecp256k1RecoveryMethod2020 => "Secp256k1".into(),
-            KeyType::EcdsaSecp256k1VerificationKey2019 => "Secp256k1".into(),
-            KeyType::RsaVerificationKey2018 => "RSA".into(),
-            KeyType::X25519KeyAgreementKey2019 => "X25519".into(),
+impl fmt::Display for KeyType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeyType::JsonWebKey2020 => write!(f, "jwk"),
+            KeyType::Ed25519VerificationKey2020 => write!(f, "Ed25519"),
+            KeyType::EcdsaSecp256k1RecoveryMethod2020 => write!(f, "Secp256k1"),
+            KeyType::EcdsaSecp256k1VerificationKey2019 => write!(f, "Secp256k1"),
+            KeyType::RsaVerificationKey2018 => write!(f, "RSA"),
+            KeyType::X25519KeyAgreementKey2019 => write!(f, "X25519"),
         }
+    }
+}
+
+impl From<KeyType> for String {
+    fn from(t: KeyType) -> Self {
+        t.to_string()
     }
 }
 
@@ -177,24 +199,20 @@ pub enum KeyPurpose {
     Xmtp,
 }
 
-impl From<KeyPurpose> for String {
-    fn from(purpose: KeyPurpose) -> String {
-        match purpose {
-            KeyPurpose::VerificationKey => "veriKey".into(),
-            KeyPurpose::SignatureAuthentication => "sigAuth".into(),
-            KeyPurpose::Encryption => "enc".into(),
-            KeyPurpose::Xmtp => "xmtp".into(),
+impl fmt::Display for KeyPurpose {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeyPurpose::VerificationKey => write!(f, "veriKey"),
+            KeyPurpose::SignatureAuthentication => write!(f, "sigAuth"),
+            KeyPurpose::Encryption => write!(f, "enc"),
+            KeyPurpose::Xmtp => write!(f, "xmtp"),
         }
     }
 }
 
-impl From<KeyEncoding> for String {
-    fn from(enc: KeyEncoding) -> String {
-        match enc {
-            KeyEncoding::Hex => "hex".into(),
-            KeyEncoding::Base64 => "base64".into(),
-            KeyEncoding::Base58 => "base58".into(),
-        }
+impl From<KeyPurpose> for String {
+    fn from(purpose: KeyPurpose) -> String {
+        purpose.to_string()
     }
 }
 
@@ -206,6 +224,26 @@ pub enum Attribute {
     Other(String),
 }
 
+impl fmt::Display for Attribute {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Attribute::PublicKey(key) => write!(
+                f,
+                "did/pub/{}/{}/{}",
+                key.key_type, key.purpose, key.encoding
+            ),
+            Attribute::Service(service) => write!(f, "did/svc/{}", service),
+            Attribute::Other(other) => write!(f, "{}", other),
+        }
+    }
+}
+
+impl From<Attribute> for String {
+    fn from(attr: Attribute) -> String {
+        attr.to_string()
+    }
+}
+
 /// Indicates the encoding of a key in a did:ethr attribute
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum KeyEncoding {
@@ -214,12 +252,33 @@ pub enum KeyEncoding {
     Base58,
 }
 
+impl fmt::Display for KeyEncoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeyEncoding::Hex => write!(f, "hex"),
+            KeyEncoding::Base64 => write!(f, "base64"),
+            KeyEncoding::Base58 => write!(f, "base58"),
+        }
+    }
+}
+impl From<KeyEncoding> for String {
+    fn from(enc: KeyEncoding) -> String {
+        enc.to_string()
+    }
+}
+
 /// Indicates the Public Key Type, Purpose, and Encoding from a did:ethr attribute name
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PublicKey {
     pub key_type: KeyType,
     pub purpose: KeyPurpose,
     pub encoding: KeyEncoding,
+}
+
+impl From<PublicKey> for Attribute {
+    fn from(key: PublicKey) -> Self {
+        Attribute::PublicKey(key)
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, Eq)]
