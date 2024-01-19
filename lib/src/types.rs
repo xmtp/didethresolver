@@ -244,6 +244,18 @@ impl From<Attribute> for String {
     }
 }
 
+// fills a [u8; 32] with bytes from the resulting Attribute String.
+// Attribute strings should never be greater than 32 bytes, but if it is, anything over 32 bytes
+// will be cutoff.
+impl From<Attribute> for [u8; 32] {
+    fn from(attribute: Attribute) -> [u8; 32] {
+        let mut attr_bytes: [u8; 32] = [0; 32];
+        let attr_string = attribute.to_string();
+        attr_bytes.copy_from_slice(&attr_string.as_bytes()[0..32]);
+        attr_bytes
+    }
+}
+
 /// Indicates the encoding of a key in a did:ethr attribute
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum KeyEncoding {
