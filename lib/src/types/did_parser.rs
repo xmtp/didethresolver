@@ -14,7 +14,7 @@ peg::parser! {
         ///
         /// # Example
         /// ```rust
-        /// use didethresolver::types::{Did, Method, Network, Account, parse_ethr_did};
+        /// use lib_didethresolver::types::{Did, Method, Network, Account, parse_ethr_did};
         /// use ethers::types::Address;
         /// let parsed = parse_ethr_did("ethr:mainnet:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
         /// assert_eq!(

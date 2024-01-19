@@ -6,9 +6,6 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 
 // TODO: Would be nice to use the anvil library instead of a CLI interface
 use anyhow::Result;
-use didethresolver::{
-    did_registry::DIDRegistry, types::DidDocument, DidRegistryMethods, DidRegistryServer, Resolver,
-};
 use ethers::{
     core::utils::{Anvil, AnvilInstance},
     middleware::SignerMiddleware,
@@ -20,6 +17,10 @@ use futures::future::FutureExt;
 use jsonrpsee::{
     server::Server,
     ws_client::{WsClient, WsClientBuilder},
+};
+use lib_didethresolver::{
+    did_registry::DIDRegistry, rpc::DidRegistryMethods, types::DidDocument, DidRegistryServer,
+    Resolver,
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::timeout as timeout_tokio;
@@ -69,9 +70,8 @@ where
     // a port of 0 chooses any open port
     let server = Server::builder().build("127.0.0.1:0").await.unwrap();
     let addr = server.local_addr().unwrap();
-    let resolver = Resolver::new(anvil.ws_endpoint(), registry_address)
-        .await
-        .unwrap();
+    let signer = client(&anvil, anvil.keys()[0].clone().into()).await;
+    let resolver = Resolver::new(signer, registry_address).await.unwrap();
     let handle = server.start(DidRegistryMethods::new(resolver).into_rpc());
 
     let client = WsClientBuilder::default()
