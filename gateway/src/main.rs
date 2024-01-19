@@ -79,33 +79,30 @@
 //!
 //! Please refer to the DID specification: [DID](https://www.w3.org/TR/did-core/)
 
-mod resolver;
-pub mod rpc;
-pub mod types;
-mod util;
-
+use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::str::FromStr;
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
-use anyhow::{Context, Result};
-use ethers::types::Address;
+use lib_didethresolver::{rpc::DidRegistryMethods, DidRegistryServer, Resolver};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    run().await?;
+    Ok(())
+}
+
+use ethers::{
+    providers::{Provider, Ws},
+    types::Address,
+};
 use jsonrpsee::server::Server;
 
-pub use crate::{
-    resolver::{did_registry, Resolver},
-    rpc::DidRegistryMethods,
-    rpc::DidRegistryServer,
-};
-
-const DEFAULT_ADDRESS: &str = "127.0.0.1:9944";
-const DEFAULT_PROVIDER: &str = "http://127.0.0.1:8545";
-
-// TODO: Get registry address from environment variable, or configuration file
-// in order to support multiple chains, we may need to support multiple providers via RPC
-// so it could be worth defining a config file that maps chainId to RPC provider (like
-// did-eth-resolver)
 /// The address of the DID Registry contract on the Ethereum Sepolia Testnet
 pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
+
+pub(crate) const DEFAULT_ADDRESS: &str = "127.0.0.1:9944";
+pub(crate) const DEFAULT_PROVIDER: &str = "http://127.0.0.1:8545";
 
 #[derive(Deserialize)]
 /// DID Ethereum Resolver XMTP Gateway
@@ -114,22 +111,22 @@ struct DidEthGatewayApp {
     #[serde(default = "default_address")]
     address: String,
 
-    /// ethereum RPC Provider
+    /// Ethereum RPC Provider
     #[serde(default = "default_provider")]
     provider: String,
 }
 
-fn default_address() -> String {
+pub(crate) fn default_address() -> String {
     DEFAULT_ADDRESS.to_string()
 }
 
-fn default_provider() -> String {
+pub(crate) fn default_provider() -> String {
     DEFAULT_PROVIDER.to_string()
 }
 
 /// Entrypoint for the did:ethr Gateway
 pub async fn run() -> Result<()> {
-    crate::util::init_logging();
+    init_logging();
     match dotenvy::dotenv() {
         Ok(path) => {
             // .env file successfully loaded.
@@ -145,19 +142,28 @@ pub async fn run() -> Result<()> {
     let server = Server::builder().build(opts.address).await?;
     let addr = server.local_addr()?;
     let registry_address = Address::from_str(DID_ETH_REGISTRY)?;
-    let provider = opts.provider.clone();
-    let resolver: Resolver = Resolver::new(opts.provider, registry_address)
+    let provider_endpoint = opts.provider.clone();
+    let provider = Provider::<Ws>::connect(provider_endpoint.clone()).await?;
+    let resolver = Resolver::new(provider, registry_address)
         .await
         .context(format!(
             "Unable to create a resolver for provider {} and registry address {}",
-            provider, registry_address,
+            provider_endpoint, registry_address,
         ))?;
 
-    let handle = server.start(rpc::DidRegistryMethods::new(resolver).into_rpc());
+    let handle = server.start(DidRegistryMethods::new(resolver).into_rpc());
 
     log::info!("Server Started at {addr}");
     handle.stopped().await;
     Ok(())
+}
+
+fn init_logging() {
+    let fmt = fmt::layer().compact();
+    Registry::default()
+        .with(EnvFilter::from_default_env())
+        .with(fmt)
+        .init()
 }
 
 #[cfg(test)]
@@ -165,7 +171,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn internal() {
+    fn test_default_addresses() {
         assert_eq!(DEFAULT_ADDRESS, default_address());
         assert_eq!(DEFAULT_PROVIDER, default_provider());
     }

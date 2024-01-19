@@ -3,15 +3,15 @@ mod integration_util;
 use std::str::FromStr;
 
 use anyhow::Result;
-use didethresolver::{
-    rpc::DidRegistryClient,
-    types::{DidUrl, KeyType, VerificationMethodProperties, NULL_ADDRESS},
-};
 use ethers::{
     signers::{LocalWallet, Signer as _},
     types::{Address, U256},
 };
 use integration_util::{validate_document, with_client};
+use lib_didethresolver::{
+    rpc::DidRegistryClient,
+    types::{DidUrl, KeyType, VerificationMethodProperties, NULL_ADDRESS},
+};
 
 //TODO: Add tests for: Errors, formats, entire document asserts
 

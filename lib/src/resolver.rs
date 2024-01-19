@@ -3,38 +3,29 @@ pub mod did_registry;
 
 use std::sync::Arc;
 
-use anyhow::Result;
 use ethers::{
     contract::LogMeta,
-    prelude::{LocalWallet, Provider, SignerMiddleware},
-    providers::{Middleware, Ws},
+    providers::Middleware,
     types::{Address, Block, H160, H256, U256, U64},
 };
 
-use rand::{rngs::StdRng, SeedableRng};
-
 use self::did_registry::{DIDRegistry, DIDRegistryEvents};
-use crate::types::{
-    DidDocument, DidDocumentMetadata, DidResolutionMetadata, DidResolutionResult, EthrBuilder,
+use crate::{
+    error::ResolverError,
+    types::{
+        DidDocument, DidDocumentMetadata, DidResolutionMetadata, DidResolutionResult, EthrBuilder,
+    },
 };
 
-type ResolverSigner = SignerMiddleware<Provider<Ws>, LocalWallet>;
-
 /// A resolver for did:ethr that follows the steps outlined in the [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#read-resolve) in order to resolve a did:ethr identifier.
-pub struct Resolver {
-    signer: Arc<ResolverSigner>,
-    registry: DIDRegistry<ResolverSigner>,
+pub struct Resolver<M> {
+    signer: Arc<M>,
+    registry: DIDRegistry<M>,
 }
 
-impl Resolver {
-    pub async fn new<Endpoint: AsRef<str>>(
-        provider_endpoint: Endpoint,
-        registry: Address,
-    ) -> Result<Self> {
-        let wallet = LocalWallet::new(&mut StdRng::from_entropy());
-        let provider = Provider::<Ws>::connect(provider_endpoint).await?;
-        let signer =
-            Arc::new(SignerMiddleware::new_with_provider_chain(provider, wallet.clone()).await?);
+impl<M: Middleware + 'static> Resolver<M> {
+    pub async fn new(middleware: M, registry: Address) -> Result<Self, ResolverError<M>> {
+        let signer = Arc::new(middleware);
         let registry = DIDRegistry::new(registry, signer.clone());
         log::debug!("Using deployed registry at {}", registry.address());
         Ok(Self { signer, registry })
@@ -44,13 +35,16 @@ impl Resolver {
         &self,
         public_key: H160,
         version_id: Option<U64>,
-    ) -> Result<DidResolutionResult> {
+    ) -> Result<DidResolutionResult, ResolverError<M>> {
         let history = self.changelog(public_key).await?;
         self.wrap_did_resolution(public_key, version_id, history)
             .await
     }
 
-    async fn changelog(&self, public_key: H160) -> Result<Vec<(DIDRegistryEvents, LogMeta)>> {
+    async fn changelog(
+        &self,
+        public_key: H160,
+    ) -> Result<Vec<(DIDRegistryEvents, LogMeta)>, ResolverError<M>> {
         let mut previous_change: U64 = self
             .registry
             .changed(public_key)
@@ -124,12 +118,20 @@ impl Resolver {
         public_key: H160,
         version_id: Option<U64>,
         history: Vec<(DIDRegistryEvents, LogMeta)>,
-    ) -> Result<DidResolutionResult> {
+    ) -> Result<DidResolutionResult, ResolverError<M>> {
         let mut base_document = DidDocument::ethr_builder();
         base_document.public_key(&public_key)?;
 
-        let current_block = self.signer.get_block_number().await?;
-        let current_block = self.signer.get_block(current_block).await?;
+        let current_block = self
+            .signer
+            .get_block_number()
+            .await
+            .map_err(|e| ResolverError::Middleware(e.to_string()))?;
+        let current_block = self
+            .signer
+            .get_block(current_block)
+            .await
+            .map_err(|e| ResolverError::Middleware(e.to_string()))?;
 
         let now = current_block.map(|b| b.timestamp).unwrap_or(U256::zero());
         let mut current_version_id = U64::zero();
@@ -174,7 +176,8 @@ impl Resolver {
         let current_version_timestamp = self
             .signer
             .get_block(current_version_id)
-            .await?
+            .await
+            .map_err(|e| ResolverError::Middleware(e.to_string()))?
             .map(block_time);
 
         let resolution_result = DidResolutionResult {
@@ -184,7 +187,12 @@ impl Resolver {
                 updated: current_version_timestamp,
                 next_version_id: last_updated_did_version_id.map(|ver| ver.as_u64()),
                 next_update: match last_updated_did_version_id {
-                    Some(ver) => self.signer.get_block(ver).await?.map(block_time),
+                    Some(ver) => self
+                        .signer
+                        .get_block(ver)
+                        .await
+                        .map_err(|e| ResolverError::Middleware(e.to_string()))?
+                        .map(block_time),
                     None => None::<String>,
                 },
             },

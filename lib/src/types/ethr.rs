@@ -15,13 +15,13 @@ use super::{
     ServiceType, VerificationMethod, VerificationMethodProperties,
 };
 use crate::{
+    error::EthrBuilderError,
     resolver::did_registry::{
         DidattributeChangedFilter, DiddelegateChangedFilter, DidownerChangedFilter,
     },
     types::{self, NULL_ADDRESS},
 };
 
-use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use ethers::types::{Address, Bytes, U256};
 use serde::{Deserialize, Serialize};
@@ -95,7 +95,7 @@ impl EthrBuilder {
     }
 
     /// set the identity of the document
-    pub fn public_key(&mut self, key: &Address) -> Result<()> {
+    pub fn public_key(&mut self, key: &Address) -> Result<(), EthrBuilderError> {
         self.id.set_account(types::Account::Address(*key));
         Ok(())
     }
@@ -106,7 +106,7 @@ impl EthrBuilder {
     }
 
     /// Set the controller of the document
-    pub fn controller(&mut self, controller: &Address) -> Result<()> {
+    pub fn controller(&mut self, controller: &Address) -> Result<(), EthrBuilderError> {
         let mut did = self.id.clone();
         did.set_account(types::Account::Address(*controller));
         self.controller = Some(did);
@@ -123,7 +123,10 @@ impl EthrBuilder {
     /// When a delegate is added or revoked, a DIDDelegateChanged event is published that MUST be used to update the DID document.
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
-    pub fn delegate_event(&mut self, event: DiddelegateChangedFilter) -> Result<()> {
+    pub fn delegate_event(
+        &mut self,
+        event: DiddelegateChangedFilter,
+    ) -> Result<(), EthrBuilderError> {
         let delegate_type = String::from_utf8_lossy(&event.delegate_type);
         let key_purpose = types::parse_delegate(&delegate_type)?;
 
@@ -148,7 +151,10 @@ impl EthrBuilder {
     /// The name of the attribute added to ERC1056 should follow this format: `did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc)/(hex|base64|base58)`
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
-    pub fn attribute_event(&mut self, event: DidattributeChangedFilter) -> Result<()> {
+    pub fn attribute_event(
+        &mut self,
+        event: DidattributeChangedFilter,
+    ) -> Result<(), EthrBuilderError> {
         let name = event.name_string_lossy();
         let attribute = types::parse_attribute(&name).unwrap_or(Attribute::Other(name.to_string()));
 
@@ -207,7 +213,7 @@ impl EthrBuilder {
     ///  When resolving DIDs with publicKey identifiers, if the controller (owner) address is different from the corresponding address of the publicKey, then the #controllerKey entry in the verificationMethod array MUST be omitted.
     ///
     ///  referecne: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#controller-changes-didownerchanged)
-    pub fn owner_event(&mut self, event: DidownerChangedFilter) -> Result<()> {
+    pub fn owner_event(&mut self, event: DidownerChangedFilter) -> Result<(), EthrBuilderError> {
         self.controller(&event.owner)?;
         if event.owner == Address::from_str(NULL_ADDRESS).expect("const address is correct") {
             // set the deactivated flag in case the address was deactivated.
@@ -225,7 +231,7 @@ impl EthrBuilder {
         index: usize,
         value: V,
         service: ServiceType,
-    ) -> Result<()> {
+    ) -> Result<(), EthrBuilderError> {
         let mut did = self.id.clone();
         did.set_fragment(Some(&format!("service-{}", index)));
         let endpoint = Url::parse(&String::from_utf8_lossy(value.as_ref()))?;
@@ -251,7 +257,7 @@ impl EthrBuilder {
         index: usize,
         value: V,
         key: PublicKey,
-    ) -> Result<()> {
+    ) -> Result<(), EthrBuilderError> {
         let mut did = self.id.clone();
         did.set_fragment(Some(&format!("delegate-{}", index)));
 
@@ -359,7 +365,7 @@ impl EthrBuilder {
     }
 
     /// Build the DID Document
-    pub fn build(mut self) -> Result<DidDocument> {
+    pub fn build(mut self) -> Result<DidDocument, EthrBuilderError> {
         self.build_controller();
 
         if !self.is_deactivated {
@@ -381,7 +387,7 @@ impl EthrBuilder {
         })
     }
 
-    fn build_keys(&mut self) -> Result<()> {
+    fn build_keys(&mut self) -> Result<(), EthrBuilderError> {
         let mut keys = self.keys.drain().collect::<Vec<(Key, usize)>>();
         keys.sort_by_key(|k| k.1);
 
@@ -884,7 +890,6 @@ mod tests {
 
     #[test]
     fn test_also_known_as() {
-        let identity = address("0xfc88f377218e665d8ede610034c4ab2b81e5f9ff");
         let other = DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f").unwrap();
         let mut builder = EthrBuilder::default();
         builder.also_known_as(&other);
