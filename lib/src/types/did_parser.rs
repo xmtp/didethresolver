@@ -83,6 +83,9 @@ peg::parser! {
         rule key_purpose() -> KeyPurpose
             = i("veriKey") { KeyPurpose::VerificationKey } / "sigAuth" { KeyPurpose::SignatureAuthentication } / "enc" { KeyPurpose::Encryption } / "xmtp" { KeyPurpose::Xmtp }
 
+        rule key_metadata() -> KeyMetadata
+            = i("inst") { KeyMetadata::Installation }
+
         rule encoding() -> KeyEncoding
             = i("hex") { KeyEncoding::Hex } / "base64" { KeyEncoding::Base64 } / "base58" { KeyEncoding::Base58 }
 
@@ -96,10 +99,13 @@ peg::parser! {
         rule service() -> ServiceType
             = padding() "did/svc/" svc:(messaging_service() / other_service()) padding()  { svc }
 
-        rule public_key() -> (KeyType, KeyPurpose, KeyEncoding)
-            = padding() "did/pub/" kt:key_type() "/" kp:key_purpose() "/" enc:encoding() padding() {
-                (kt, kp, enc)
+        rule public_key() -> (KeyType, KeyPurpose, Option<KeyMetadata>, KeyEncoding)
+            = padding() "did/pub/" kt:key_type() "/" kp:key_purpose() "/" me:metadata_and_encoding() padding() {
+                (kt, kp, me.0, me.1)
             }
+
+        rule metadata_and_encoding() -> (Option<KeyMetadata>, KeyEncoding)
+            = km:key_metadata() "/" enc:encoding() { (Some(km), enc) } / enc:encoding() { (None, enc) }
 
         /// Parses the DID attribute name value
         ///
@@ -107,7 +113,7 @@ peg::parser! {
         /// or the `did/svc/[ServiceName]` part for adding a service
         pub rule attribute() -> Attribute
             = pk:public_key() {
-                let key = PublicKey { key_type: pk.0, purpose: pk.1, encoding: pk.2 };
+                let key = PublicKey { key_type: pk.0, purpose: pk.1, metadata: pk.2, encoding: pk.3 };
                 Attribute::PublicKey(key)
             }
             / svc:service() { Attribute::Service(svc) }
@@ -181,12 +187,12 @@ mod tests {
             "did/pub/X25519/enc/hex",
             "did/pub/X25519/enc/base64",
             "did/pub/X25519/enc/base58",
-            "did/pub/ed25519/xmtp/hex",
-            "did/pub/x25519/xmtp/hex",
-            "did/pub/Secp256k1/xmtp/hex",
-            "did/pub/RSA/xmtp/hex",
-            "did/pub/ed25519/xmtp/base64",
-            "did/pub/ed25519/xmtp/base58",
+            "did/pub/ed25519/xmtp/inst/hex",
+            "did/pub/x25519/xmtp/inst/hex",
+            "did/pub/Secp256k1/xmtp/inst/hex",
+            "did/pub/RSA/xmtp/inst/hex",
+            "did/pub/ed25519/xmtp/inst/base64",
+            "did/pub/ed25519/xmtp/inst/base58",
             "did/svc/MessagingService",
         ];
 

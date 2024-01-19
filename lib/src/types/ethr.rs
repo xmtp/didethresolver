@@ -11,8 +11,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::{
-    Account, Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey, Service,
-    ServiceType, VerificationMethod, VerificationMethodProperties,
+    Account, Attribute, DidDocument, DidUrl, KeyEncoding, KeyMetadata, KeyPurpose, KeyType,
+    PublicKey, Service, ServiceType, VerificationMethod, VerificationMethodProperties,
 };
 use crate::{
     error::EthrBuilderError,
@@ -281,7 +281,6 @@ impl EthrBuilder {
             }),
         };
 
-        self.verification_method.push(method.clone());
         match key.purpose {
             KeyPurpose::SignatureAuthentication => {
                 self.authentication.push(method.id.clone());
@@ -293,10 +292,17 @@ impl EthrBuilder {
                 self.key_agreement.push(method.id.clone());
             }
             KeyPurpose::Xmtp => {
-                method.id.set_query(Some("xmtp"));
+                method.id.append_path("xmtp");
+                match key.metadata {
+                    Some(KeyMetadata::Installation) => {
+                        method.id.set_query("meta", Some("installation_key"))
+                    }
+                    _ => method.id.set_query("meta", None),
+                }
                 self.authentication.push(method.id.clone());
             }
         };
+        self.verification_method.push(method.clone());
         Ok(())
     }
 
@@ -895,5 +901,32 @@ mod tests {
         builder.also_known_as(&other);
         builder.now(U256::zero());
         assert_eq!(builder.also_known_as[0], other);
+    }
+
+    #[test]
+    fn test_xmtp_keys() {
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let attributes = vec![DidattributeChangedFilter {
+            name: *b"did/pub/ed25519/xmtp/inst/hex   ",
+            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            ..base_attr_changed(identity, None)
+        }];
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::zero());
+
+        for attr in attributes {
+            builder.attribute_event(attr).unwrap()
+        }
+
+        let doc = builder.build().unwrap();
+        /*
+                assert_eq!(
+                    doc.verification_method[1].id.fragment().unwrap(),
+                    "delegate-0"
+                );
+        */
+        println!("{}", serde_json::to_string_pretty(&doc).unwrap());
     }
 }

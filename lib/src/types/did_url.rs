@@ -236,13 +236,9 @@ impl DidUrl {
         self.query.as_deref()
     }
 
-    pub fn set_query(&mut self, query: Option<&str>) {
-        // replace the query
-        if let Some(query) = query {
-            self.query = Some(query.to_string());
-        } else {
-            self.query = None;
-        }
+    pub fn set_query(&mut self, key: &str, value: Option<&str>) {
+        let query = format!("{}={}", key, value.unwrap_or(""));
+        self.query = Some(query);
     }
 
     /// Returns this DID's fragment identifier, if any.
@@ -286,9 +282,6 @@ impl DidUrl {
 
     /// Change this DID's path
     ///
-    /// # Returns
-    /// A Result indicating if the path was successfully set.
-    ///
     /// # Examples
     /// ```
     /// use lib_didethresolver::types::DidUrl;
@@ -298,11 +291,15 @@ impl DidUrl {
     /// assert_eq!(did_url.path, "/path/to/resource");
     /// ```
     ///
-    /// # Errors
-    /// returns a [`DidError`] if the parsing of the URI fails because it is not the expected format or if the method is unsupported.
-    ///
     pub fn set_path(&mut self, path: &str) {
         self.path = path.to_string();
+    }
+
+    /// Append a path segment to the path of this [`DidUrl`]
+    ///
+    ///
+    pub fn append_path(&mut self, path: &str) {
+        self.path = self.path.to_string() + "/" + path;
     }
 
     pub fn set_account(&mut self, account: Account) {

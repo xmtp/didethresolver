@@ -191,6 +191,20 @@ impl From<KeyType> for String {
     }
 }
 
+/// Any extra key-specific metadata that could be ascribed to the key
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KeyMetadata {
+    Installation,
+}
+
+impl fmt::Display for KeyMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeyMetadata::Installation => write!(f, "inst"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KeyPurpose {
     VerificationKey,
@@ -284,6 +298,7 @@ impl From<KeyEncoding> for String {
 pub struct PublicKey {
     pub key_type: KeyType,
     pub purpose: KeyPurpose,
+    pub metadata: Option<KeyMetadata>,
     pub encoding: KeyEncoding,
 }
 
