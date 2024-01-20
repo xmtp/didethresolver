@@ -31,3 +31,4 @@ jobs:
           push: false
           build-args: |
             VERSION=latest
+            CARGO_INCREMENTAL=0

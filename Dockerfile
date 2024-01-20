@@ -1,5 +1,5 @@
 FROM ghcr.io/xmtp/rust:latest
-
+ARG CARGO_INCREMENTAL
 ARG PROJECT=didethresolver
 WORKDIR /workspaces/${PROJECT}
 
@@ -14,6 +14,7 @@ COPY --from=ghcr.io/xmtp/foundry:latest /usr/local/bin/anvil /usr/local/bin/anvi
 
 COPY --chown=xmtp:xmtp . .
 
+ENV CARGO_INCREMENTAL=${CARGO_INCREMENTAL:-1}
 RUN cargo fmt --check --all
 RUN cargo clippy --all-features --no-deps -- -D warnings
 RUN cargo test --workspace --all-features

@@ -57,7 +57,7 @@
         {
             "label": "test",
             "type": "shell",
-            "command": "cargo test",
+            "command": "cargo test --workspace --all-features --no-fail-fast",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
