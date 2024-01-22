@@ -65,3 +65,38 @@ impl<M> DIDRegistry<M> {
         Ok(signature)
     }
 }
+
+#[async_trait::async_trait]
+pub trait RegistrySignerExt: Signer {
+    async fn sign_attribute(
+        &self,
+        key: [u8; 32],
+        value: Vec<u8>,
+        validity: U256,
+    ) -> Result<Signature, RegistryError> {
+        let tokens = vec![
+            Token::Bytes(b"SetAttribute".to_vec()),
+            Token::FixedBytes(key.to_vec()),
+            Token::Bytes(value),
+            Token::Uint(validity),
+        ];
+        let encoded = encode(tokens.as_slice());
+        let signature = self
+            .sign_message(encoded)
+            .await
+            .map_err(|e| RegistryError::SignError(e.to_string()))?;
+        Ok(signature)
+    }
+}
+
+impl<T> RegistrySignerExt for T where T: Signer {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    pub fn test_sign_attribute() {
+        todo!()
+    }
+}
