@@ -241,11 +241,21 @@ pub enum Attribute {
 impl fmt::Display for Attribute {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Attribute::PublicKey(key) => write!(
-                f,
-                "did/pub/{}/{}/{}",
-                key.key_type, key.purpose, key.encoding
-            ),
+            Attribute::PublicKey(key) => {
+                if let Some(metadata) = key.metadata {
+                    write!(
+                        f,
+                        "did/pub/{}/{}/{}/{}",
+                        key.key_type, key.purpose, metadata, key.encoding
+                    )
+                } else {
+                    write!(
+                        f,
+                        "did/pub/{}/{}/{}",
+                        key.key_type, key.purpose, key.encoding
+                    )
+                }
+            }
             Attribute::Service(service) => write!(f, "did/svc/{}", service),
             Attribute::Other(other) => write!(f, "{}", other),
         }
@@ -263,9 +273,10 @@ impl From<Attribute> for String {
 // will be cutoff.
 impl From<Attribute> for [u8; 32] {
     fn from(attribute: Attribute) -> [u8; 32] {
-        let mut attr_bytes: [u8; 32] = [0; 32];
+        let mut attr_bytes: [u8; 32] = [b' '; 32];
         let attr_string = attribute.to_string();
-        attr_bytes.copy_from_slice(&attr_string.as_bytes()[0..32]);
+        let length = std::cmp::min(attr_string.as_bytes().len(), 32);
+        attr_bytes[0..length].copy_from_slice(&attr_string.as_bytes()[0..length]);
         attr_bytes
     }
 }
@@ -441,5 +452,19 @@ mod test {
         );
         assert_eq!(String::from(KeyType::RsaVerificationKey2018), "RSA");
         assert_eq!(String::from(KeyType::X25519KeyAgreementKey2019), "X25519");
+    }
+
+    #[test]
+    fn test_attribute_to_bytes() {
+        let t = |attribute: &str| {
+            let parsed: Attribute = parse_attribute(attribute).unwrap();
+            let bytes: [u8; 32] = parsed.into();
+            assert_eq!(String::from_utf8_lossy(&bytes), attribute);
+        };
+        t("did/pub/Ed25519/xmtp/inst/base58");
+        t("did/svc/MessagingService        ");
+        t("did/pub/Secp256k1/xmtp/inst/hex ");
+        t("did/pub/RSA/xmtp/inst/hex       ");
+        t("did/pub/Ed25519/xmtp/inst/base64");
     }
 }
