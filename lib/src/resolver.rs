@@ -95,7 +95,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                 doc.delegate_event(delegate_changed)
             }
             DIDRegistryEvents::DidattributeChangedFilter(attribute_event) => {
-                log::trace!("Attribute Changed {:?}", attribute_event)
+                log::trace!("Attribute Changed {:?}", attribute_event);
                 doc.attribute_event(attribute_event)
             }
             DIDRegistryEvents::DidownerChangedFilter(owner_changed) => {
