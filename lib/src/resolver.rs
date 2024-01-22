@@ -70,6 +70,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                 .await?;
 
             for (event, meta) in events {
+                log::trace!("Adding {:?} event to history", event);
                 if event.previous_change() < previous_change {
                     previous_change = event.previous_change();
                 }
@@ -90,12 +91,15 @@ impl<M: Middleware + 'static> Resolver<M> {
     ) {
         let res = match event {
             DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
+                log::trace!("Delegate Changed {:?}", delegate_changed);
                 doc.delegate_event(delegate_changed)
             }
             DIDRegistryEvents::DidattributeChangedFilter(attribute_event) => {
+                log::trace!("Attribute Changed {:?}", attribute_event)
                 doc.attribute_event(attribute_event)
             }
             DIDRegistryEvents::DidownerChangedFilter(owner_changed) => {
+                log::trace!("Owner Changed {:?}", owner_changed);
                 doc.owner_event(owner_changed)
             }
         };
