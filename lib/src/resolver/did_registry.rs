@@ -5,7 +5,6 @@ use ethers::{
     abi::Token,
     contract::abigen,
     core::abi::encode,
-    providers::Middleware,
     signers::Signer,
     types::{Signature, U256, U64},
 };
@@ -44,7 +43,7 @@ impl DidattributeChangedFilter {
     }
 }
 
-impl<M: Middleware> DIDRegistry<M> {
+impl<M> DIDRegistry<M> {
     /// Sign an Attribute
     pub async fn sign_attribute(
         signer: impl Signer,

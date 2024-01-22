@@ -1,4 +1,4 @@
-use ethers::{contract::ContractError, providers::Middleware, signers::Signer};
+use ethers::{contract::ContractError, providers::Middleware};
 use jsonrpsee::types::ErrorObjectOwned;
 use thiserror::Error;
 
