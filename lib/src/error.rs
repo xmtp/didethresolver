@@ -1,4 +1,4 @@
-use ethers::{contract::ContractError, providers::Middleware};
+use ethers::{contract::ContractError, providers::Middleware, signers::Signer};
 use jsonrpsee::types::ErrorObjectOwned;
 use thiserror::Error;
 
@@ -39,4 +39,10 @@ impl<M: Middleware> From<ResolverError<M>> for ErrorObjectOwned {
     fn from(err: ResolverError<M>) -> Self {
         ErrorObjectOwned::owned(-31000, err.to_string(), None::<()>)
     }
+}
+
+#[derive(Error, Debug)]
+pub enum RegistryError {
+    #[error("Sign Error {0}")]
+    SignError(String),
 }

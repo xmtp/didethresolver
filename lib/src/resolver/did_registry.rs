@@ -1,6 +1,14 @@
 //! Generated ABI Functions, along with some extra to make it easier to interact with the registry.
 
-use ethers::{contract::abigen, types::U64};
+use crate::error::RegistryError;
+use ethers::{
+    abi::Token,
+    contract::abigen,
+    core::abi::encode,
+    providers::Middleware,
+    signers::Signer,
+    types::{Signature, U256, U64},
+};
 
 pub use self::did_registry::*;
 
@@ -33,5 +41,28 @@ impl DidattributeChangedFilter {
 
     pub fn name_string_lossy(&self) -> String {
         String::from_utf8_lossy(self.name.as_ref()).to_string()
+    }
+}
+
+impl<M: Middleware> DIDRegistry<M> {
+    /// Sign an Attribute
+    pub async fn sign_attribute(
+        signer: impl Signer,
+        key: [u8; 32],
+        value: Vec<u8>,
+        validity: U256,
+    ) -> Result<Signature, RegistryError> {
+        let tokens = vec![
+            Token::Bytes(b"SetAttribute".to_vec()),
+            Token::FixedBytes(key.to_vec()),
+            Token::Bytes(value),
+            Token::Uint(validity),
+        ];
+        let encoded = encode(tokens.as_slice());
+        let signature = signer
+            .sign_message(encoded)
+            .await
+            .map_err(|e| RegistryError::SignError(e.to_string()))?;
+        Ok(signature)
     }
 }
