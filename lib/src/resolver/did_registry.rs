@@ -46,7 +46,7 @@ impl DidattributeChangedFilter {
 }
 
 /// Signer for data that is externally signed to be processed by the DIDRegistry Contract.
-/// Useful if the transction is being submitted by someone other than the owner of the identity.
+/// Useful if the transaction is being submitted by someone other than the owner of the identity.
 #[async_trait::async_trait]
 pub trait RegistrySignerExt {
     /// Sign hash of the data for [`DIDRegistry::set_attribute_signed`]
