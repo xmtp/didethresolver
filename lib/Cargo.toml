@@ -38,6 +38,7 @@ smart-default = "0.7"
 sha3 = "0.10"
 peg = "0.8"
 rustc-hex = "2.1"
+tiny-keccak = { version = "2.0.2", default-features = false }
 
 [dev-dependencies]
 tracing-subscriber.workspace = true 

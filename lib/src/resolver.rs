@@ -53,6 +53,8 @@ impl<M: Middleware + 'static> Resolver<M> {
             .as_u64()
             .into();
 
+        log::trace!("Previous Change for {}: {:?}", public_key, previous_change);
+
         let mut history = Vec::new();
 
         loop {

@@ -1,4 +1,9 @@
-use ethers::{contract::ContractError, providers::Middleware};
+use ethers::{
+    abi::{Address, EncodePackedError},
+    contract::{ContractError, EthError},
+    providers::{Middleware, ProviderError},
+    signers::WalletError,
+};
 use jsonrpsee::types::ErrorObjectOwned;
 use thiserror::Error;
 
@@ -42,7 +47,21 @@ impl<M: Middleware> From<ResolverError<M>> for ErrorObjectOwned {
 }
 
 #[derive(Error, Debug)]
-pub enum RegistryError {
+pub enum RegistrySignerError<M: Middleware> {
     #[error("Sign Error {0}")]
     SignError(String),
+    #[error(transparent)]
+    Encode(#[from] EncodePackedError),
+    #[error("{0}")]
+    ContractError(#[from] ContractError<M>),
+    #[error(transparent)]
+    Provider(#[from] ProviderError),
+    #[error(transparent)]
+    Wallet(#[from] WalletError),
+}
+
+#[derive(EthError, Clone, Debug)]
+pub struct BadSignature {
+    identity: Address,
+    signer: Address,
 }
