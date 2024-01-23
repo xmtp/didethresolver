@@ -353,8 +353,8 @@ pub async fn test_signed_fns() -> Result<()> {
         let attr = registry.set_attribute_signed(
             me.address(),
             signature.v.try_into().unwrap(),
-            signature.r.try_into().unwrap(),
-            signature.s.try_into().unwrap(),
+            signature.r.into(),
+            signature.s.into(),
             name,
             value.into(),
             validity,
@@ -368,8 +368,8 @@ pub async fn test_signed_fns() -> Result<()> {
             .revoke_attribute_signed(
                 me.address(),
                 signature.v.try_into().unwrap(),
-                signature.r.try_into().unwrap(),
-                signature.s.try_into().unwrap(),
+                signature.r.into(),
+                signature.s.into(),
                 name,
                 value.into(),
             )
@@ -386,8 +386,8 @@ pub async fn test_signed_fns() -> Result<()> {
             .add_delegate_signed(
                 me.address(),
                 signature.v.try_into().unwrap(),
-                signature.r.try_into().unwrap(),
-                signature.s.try_into().unwrap(),
+                signature.r.into(),
+                signature.s.into(),
                 delegate_type,
                 me.address(),
                 validity,
@@ -404,8 +404,8 @@ pub async fn test_signed_fns() -> Result<()> {
             .revoke_delegate_signed(
                 me.address(),
                 signature.v.try_into().unwrap(),
-                signature.r.try_into().unwrap(),
-                signature.s.try_into().unwrap(),
+                signature.r.into(),
+                signature.s.into(),
                 delegate_type,
                 me.address(),
             )
@@ -419,8 +419,8 @@ pub async fn test_signed_fns() -> Result<()> {
             .change_owner_signed(
                 me.address(),
                 signature.v.try_into().unwrap(),
-                signature.r.try_into().unwrap(),
-                signature.s.try_into().unwrap(),
+                signature.r.into(),
+                signature.s.into(),
                 new_owner,
             )
             .send()
