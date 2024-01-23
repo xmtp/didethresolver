@@ -121,7 +121,7 @@ async fn deploy_to_anvil(anvil: &AnvilInstance) -> Address {
     registry.address()
 }
 
-async fn client(
+pub async fn client(
     anvil: &AnvilInstance,
     wallet: LocalWallet,
 ) -> Arc<SignerMiddleware<Provider<Ws>, LocalWallet>> {

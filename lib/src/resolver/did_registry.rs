@@ -45,8 +45,11 @@ impl DidattributeChangedFilter {
     }
 }
 
+/// Signer for data that is externally signed to be processed by the DIDRegistry Contract.
+/// Useful if the transction is being submitted by someone other than the owner of the identity.
 #[async_trait::async_trait]
 pub trait RegistrySignerExt {
+    /// Sign hash of the data for [`DIDRegistry::set_attribute_signed`]
     async fn sign_attribute<M: Middleware>(
         &self,
         registry: &DIDRegistry<M>,
@@ -54,9 +57,16 @@ pub trait RegistrySignerExt {
         value: Vec<u8>,
         validity: U256,
     ) -> Result<Signature, RegistrySignerError<M>>;
-    
-    async fn sign_revoke_attribute<M: Middleware>(&self, registry: &DIDRegistry<M>, key: [u8; 32], value: Vec<u8>) -> Result<Signature, RegistrySignerError<M>>;
 
+    /// Sign hash of the data for [`DIDRegistry::revoke_attribute_signed`]
+    async fn sign_revoke_attribute<M: Middleware>(
+        &self,
+        registry: &DIDRegistry<M>,
+        key: [u8; 32],
+        value: Vec<u8>,
+    ) -> Result<Signature, RegistrySignerError<M>>;
+
+    /// Sign hash of the data for [`DIDRegistry::add_delegate_signed`]
     async fn sign_delegate<M: Middleware>(
         &self,
         registry: &DIDRegistry<M>,
@@ -64,9 +74,16 @@ pub trait RegistrySignerExt {
         delegate: Address,
         validity: U256,
     ) -> Result<Signature, RegistrySignerError<M>>;
-    
-    async fn sign_revoke_delegate<M: Middleware>(&self, registry: &DIDRegistry<M>, key: [u8; 32], value: Vec<u8>) -> Result<Signature, RegistrySignerError<M>>;
-    
+
+    /// Sign hash of the data for [`DIDRegistry::revoke_delegate_signed`]
+    async fn sign_revoke_delegate<M: Middleware>(
+        &self,
+        registry: &DIDRegistry<M>,
+        key: [u8; 32],
+        delegate: Address,
+    ) -> Result<Signature, RegistrySignerError<M>>;
+
+    /// Sign hash of the data for [`DIDRegistry::change_owner_signed`]
     async fn sign_owner<M: Middleware>(
         &self,
         registry: &DIDRegistry<M>,
@@ -97,8 +114,17 @@ impl RegistrySignerExt for LocalWallet {
         sign_data(self, registry, message).await
     }
 
-    async fn sign_revoke_attribute<M: Middleware>(&self, registry: &DIDRegistry<M>, key: [u8; 32], value: Vec<u8>) -> Result<Signature, RegistrySignerError<M>> {
-        let message = vec![Token::Bytes(b"revokeAttribute".to_vec()), Token::FixedBytes(key.to_vec()), Token::Bytes(value.to_vec())];
+    async fn sign_revoke_attribute<M: Middleware>(
+        &self,
+        registry: &DIDRegistry<M>,
+        key: [u8; 32],
+        value: Vec<u8>,
+    ) -> Result<Signature, RegistrySignerError<M>> {
+        let message = vec![
+            Token::Bytes(b"revokeAttribute".to_vec()),
+            Token::FixedBytes(key.to_vec()),
+            Token::Bytes(value.to_vec()),
+        ];
         sign_data(self, registry, message).await
     }
 
@@ -122,8 +148,17 @@ impl RegistrySignerExt for LocalWallet {
         sign_data(self, registry, message).await
     }
 
-    async fn sign_revoke_delegate<M: Middleware>(&self, registry: &DIDRegistry<M>, key: [u8; 32], value: Vec<u8>) -> Result<Signature, RegistrySignerError<M>> {
-        let message = vec![Token::Bytes(b"revokeDelegate".to_vec()), Token::FixedBytes(key.to_vec()), Token::Bytes(value.to_vec())];
+    async fn sign_revoke_delegate<M: Middleware>(
+        &self,
+        registry: &DIDRegistry<M>,
+        key: [u8; 32],
+        delegate: Address,
+    ) -> Result<Signature, RegistrySignerError<M>> {
+        let message = vec![
+            Token::Bytes(b"revokeDelegate".to_vec()),
+            Token::FixedBytes(key.to_vec()),
+            Token::Address(delegate),
+        ];
         sign_data(self, registry, message).await
     }
 
@@ -132,7 +167,10 @@ impl RegistrySignerExt for LocalWallet {
         registry: &DIDRegistry<M>,
         new_owner: Address,
     ) -> Result<Signature, RegistrySignerError<M>> {
-        let message = vec![Token::Bytes(b"changeOwner".to_vec()), Token::Address(new_owner)];
+        let message = vec![
+            Token::Bytes(b"changeOwner".to_vec()),
+            Token::Address(new_owner),
+        ];
         sign_data(self, registry, message).await
     }
 }
@@ -174,14 +212,4 @@ pub fn keccak256<T: AsRef<[u8]>>(bytes: T) -> [u8; 32] {
     hasher.finalize(&mut output);
 
     output
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    pub fn test_sign_attribute() {
-        todo!()
-    }
 }

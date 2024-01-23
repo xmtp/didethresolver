@@ -9,6 +9,7 @@ use ethers::{
 };
 use integration_util::{validate_document, with_client};
 use lib_didethresolver::{
+    did_registry::RegistrySignerExt,
     rpc::DidRegistryClient,
     types::{DidUrl, KeyType, VerificationMethodProperties, NULL_ADDRESS},
 };
@@ -331,6 +332,100 @@ pub async fn test_xmtp_revocation() -> Result<()> {
             DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
         );
         assert_eq!(document.verification_method.len(), 1);
+
+        Ok(())
+    })
+    .await
+}
+
+#[tokio::test]
+pub async fn test_signed_fns() -> Result<()> {
+    with_client(None, |_, registry, _, anvil| async move {
+        let me: LocalWallet = anvil.keys()[3].clone().into();
+
+        let name = *b"did/pub/Ed25519/xmtp/inst/hex   ";
+        let value = b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71";
+        let validity = U256::from(604_800);
+        let signature = me
+            .sign_attribute(&registry, name, value.to_vec(), validity)
+            .await?;
+
+        let attr = registry.set_attribute_signed(
+            me.address(),
+            signature.v.try_into().unwrap(),
+            signature.r.try_into().unwrap(),
+            signature.s.try_into().unwrap(),
+            name,
+            value.into(),
+            validity,
+        );
+        attr.send().await?.await?;
+
+        let signature = me
+            .sign_revoke_attribute(&registry, name, value.to_vec())
+            .await?;
+        registry
+            .revoke_attribute_signed(
+                me.address(),
+                signature.v.try_into().unwrap(),
+                signature.r.try_into().unwrap(),
+                signature.s.try_into().unwrap(),
+                name,
+                value.into(),
+            )
+            .send()
+            .await?
+            .await?;
+
+        let delegate_type = *b"sigAuth                         ";
+
+        let signature = me
+            .sign_delegate(&registry, delegate_type, me.address(), validity)
+            .await?;
+        registry
+            .add_delegate_signed(
+                me.address(),
+                signature.v.try_into().unwrap(),
+                signature.r.try_into().unwrap(),
+                signature.s.try_into().unwrap(),
+                delegate_type,
+                me.address(),
+                validity,
+            )
+            .send()
+            .await?
+            .await?;
+
+        let signature = me
+            .sign_revoke_delegate(&registry, delegate_type, me.address())
+            .await?;
+
+        registry
+            .revoke_delegate_signed(
+                me.address(),
+                signature.v.try_into().unwrap(),
+                signature.r.try_into().unwrap(),
+                signature.s.try_into().unwrap(),
+                delegate_type,
+                me.address(),
+            )
+            .send()
+            .await?
+            .await?;
+
+        let new_owner = Address::from_str(NULL_ADDRESS.strip_prefix("0x").unwrap()).unwrap();
+        let signature = me.sign_owner(&registry, new_owner).await?;
+        registry
+            .change_owner_signed(
+                me.address(),
+                signature.v.try_into().unwrap(),
+                signature.r.try_into().unwrap(),
+                signature.s.try_into().unwrap(),
+                new_owner,
+            )
+            .send()
+            .await?
+            .await?;
 
         Ok(())
     })

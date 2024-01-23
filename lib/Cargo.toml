@@ -52,7 +52,6 @@ futures = "0.3"
 ctor = "0.2.5"
 surf = "2.3"
 
-
 [features]
 default = []
 client = ["jsonrpsee/client"]
