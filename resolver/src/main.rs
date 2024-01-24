@@ -80,17 +80,10 @@
 //! Please refer to the DID specification: [DID](https://www.w3.org/TR/did-core/)
 
 use anyhow::{Context, Result};
-use serde::Deserialize;
 use std::str::FromStr;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
 use lib_didethresolver::{rpc::DidRegistryMethods, DidRegistryServer, Resolver};
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    run().await?;
-    Ok(())
-}
 
 use ethers::{
     providers::{Provider, Ws},
@@ -98,51 +91,22 @@ use ethers::{
 };
 use jsonrpsee::server::Server;
 
-/// The address of the DID Registry contract on the Ethereum Sepolia Testnet
-pub const DID_ETH_REGISTRY: &str = "0xd1D374DDE031075157fDb64536eF5cC13Ae75000";
-
-pub(crate) const DEFAULT_ADDRESS: &str = "127.0.0.1:9944";
-pub(crate) const DEFAULT_PROVIDER: &str = "http://127.0.0.1:8545";
-
-#[derive(Deserialize)]
-/// DID Ethereum Resolver XMTP Gateway
-struct DidEthGatewayApp {
-    /// the address to start the server
-    #[serde(default = "default_address")]
-    address: String,
-
-    /// Ethereum RPC Provider
-    #[serde(default = "default_provider")]
-    provider: String,
-}
-
-pub(crate) fn default_address() -> String {
-    DEFAULT_ADDRESS.to_string()
-}
-
-pub(crate) fn default_provider() -> String {
-    DEFAULT_PROVIDER.to_string()
-}
+mod argenv;
 
 /// Entrypoint for the did:ethr Gateway
 pub async fn run() -> Result<()> {
     init_logging();
-    match dotenvy::dotenv() {
-        Ok(path) => {
-            // .env file successfully loaded.
-            log::debug!("Env file {} was loaded successfully", path.display());
-        }
-        Err(err) => {
-            // Error handling for the case where dotenv() fails
-            log::info!("Unable to load env file(s) : {err}");
-        }
-    }
-    let opts = envy::from_env::<DidEthGatewayApp>()?;
+    load_env()?;
+    let opts = argenv::parse_args();
 
-    let server = Server::builder().build(opts.address).await?;
+    let server_host = host_from(opts.host, opts.port);
+    let server = Server::builder().build(server_host).await?;
     let addr = server.local_addr()?;
-    let registry_address = Address::from_str(DID_ETH_REGISTRY)?;
-    let provider_endpoint = opts.provider.clone();
+    let registry_address = Address::from_str(&opts.did_registry)?;
+    let provider_endpoint = opts.rpc_url.clone();
+    log::info!(
+        "Connecting to provider {provider_endpoint} with registry address {registry_address}"
+    );
     let provider = Provider::<Ws>::connect(provider_endpoint.clone()).await?;
     let resolver = Resolver::new(provider, registry_address)
         .await
@@ -158,6 +122,24 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
+fn load_env() -> Result<()> {
+    match dotenvy::dotenv_override() {
+        Ok(path) => {
+            // .env file successfully loaded.
+            log::debug!("Env file {} was loaded successfully", path.display());
+        }
+        Err(err) => {
+            // Error handling for the case where dotenv() fails
+            log::info!("env file(s) not loaded : {err}");
+        }
+    };
+    Ok(())
+}
+
+fn host_from(host: String, port: u16) -> String {
+    format!("{}:{}", host, port)
+}
+
 fn init_logging() {
     let fmt = fmt::layer().compact();
     Registry::default()
@@ -166,13 +148,19 @@ fn init_logging() {
         .init()
 }
 
+#[tokio::main]
+async fn main() -> Result<()> {
+    run().await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_default_addresses() {
-        assert_eq!(DEFAULT_ADDRESS, default_address());
-        assert_eq!(DEFAULT_PROVIDER, default_provider());
+    fn test_host_from() {
+        assert_eq!(host_from(String::from("abc"), 123), "abc:123");
+        assert_eq!(host_from(String::from("abc"), 0), "abc:0");
     }
 }

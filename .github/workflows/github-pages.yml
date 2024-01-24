@@ -42,7 +42,7 @@ jobs:
       - name: Invoke cargo doc
         run: |
           rm -rf ./_site
-          cargo doc --lib --no-deps
+          cargo doc --workspace --no-deps
           rm -f target/doc/.lock
           cp -r target/doc _site
           echo "<meta http-equiv=\"refresh\" content=\"0; url=didethresolver\">" > _site/index.html

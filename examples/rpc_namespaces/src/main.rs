@@ -16,6 +16,7 @@ use ethers::{
 };
 use jsonrpsee::{server::Server, RpcModule};
 use lib_didethresolver::{rpc::DidRegistryMethods, DidRegistryServer, Resolver};
+
 use turtle_rpc::{TurtleMethods, TurtleRpcServer};
 
 mod turtle_rpc;
@@ -71,4 +72,19 @@ fn build_rpc_api<M: Send + Sync + 'static>(mut rpc_api: RpcModule<M>) -> RpcModu
         .expect("infallible all other methods have their own address space; qed");
 
     rpc_api
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn test_rpc_methods() -> Result<()> {
+        let mut methods = RpcModule::new(());
+        methods.merge(TurtleMethods.into_rpc())?;
+        let methods = build_rpc_api(methods);
+        assert!(methods
+            .method_names()
+            .any(|method| { method == "turtle_sayHello" }));
+        Ok(())
+    }
 }

@@ -1,6 +1,7 @@
 # didethresolver
 
 [![Test](https://github.com/xmtp/didethresolver/actions/workflows/ci-image.yml/badge.svg)](https://github.com/xmtp/didethresolver/actions/workflows/ci-image.yml)
+[![codecov](https://codecov.io/gh/xmtp/didethresolver/graph/badge.svg?token=94DHM3ODWQ)](https://codecov.io/gh/xmtp/didethresolver)
 
 This resolver service implements a DID registry resolver to resolve
 decentralized identifiers for the XMTP client sdk.
@@ -70,6 +71,6 @@ See the `examples/` folder for more usage examples
 ## Organization
 
 The workspace is organized into a binary and library crate. the binary,
-`didethresolver`, runs a standalone JSON-RPC server which resolves DIDs. The
+`resolver`, runs a standalone JSON-RPC server which resolves DIDs. The
 library, `lib-didethresolver` provides methods and types used to resolve dids,
 as well as build a JSON-RPC client and server.

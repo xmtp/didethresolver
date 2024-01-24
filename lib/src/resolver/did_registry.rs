@@ -15,7 +15,7 @@ pub use self::did_registry::*;
 
 abigen!(
     DIDRegistry,
-    "./abi/DIDRegistry.json",
+    "./lib/abi/DIDRegistry.json",
     derives(serde::Serialize, serde::Deserialize)
 );
 

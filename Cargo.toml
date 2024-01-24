@@ -1,8 +1,8 @@
 [workspace]
 members = [
   "lib",
-  "gateway",
-   "examples/*",
+  "resolver",
+  "examples/*",
 ]
 
 exclude = [ ]
