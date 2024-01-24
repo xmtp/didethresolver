@@ -19,7 +19,7 @@ pub enum ResolverError<M: Middleware> {
 }
 
 /// Errors originating from the parsing of a did url identifier, [`Did`](crate::types::DidUrl)
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum DidError {
     #[error("Parsing of ethr:did failed, {0}")]
     Parse(#[from] peg::error::ParseError<peg::str::LineCol>),
@@ -28,7 +28,7 @@ pub enum DidError {
 }
 
 /// Errors originating during the construction of a ethr:did document [`EthrBuilder`](crate::types::EthrBuilder)
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum EthrBuilderError {
     #[error(transparent)]
     Did(#[from] DidError),
@@ -38,6 +38,8 @@ pub enum EthrBuilderError {
     Hex(#[from] hex::FromHexError),
     #[error("Parsing part of ethr:did failed, {0}")]
     Parse(#[from] peg::error::ParseError<peg::str::LineCol>),
+    #[error("XMTP Key is missing key purpose metadata")]
+    MissingMetadata,
 }
 
 impl<M: Middleware> From<ResolverError<M>> for ErrorObjectOwned {

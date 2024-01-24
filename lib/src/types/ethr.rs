@@ -298,7 +298,7 @@ impl EthrBuilder {
                         //TODO: Formalize XMTP metadata into typed enum
                         method.id.set_query("meta", Some("installation_key"))
                     }
-                    _ => method.id.set_query("meta", None),
+                    _ => return Err(EthrBuilderError::MissingMetadata),
                 }
                 self.authentication.push(method.id.clone());
             }
@@ -932,5 +932,24 @@ mod tests {
             "meta=installation_key"
         );
         assert_eq!(doc.verification_method[1].id.path(), "/xmtp");
+    }
+
+    #[test]
+    fn test_xmtp_keys_no_metadata() {
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let attributes = vec![DidattributeChangedFilter {
+            name: *b"did/pub/ed25519/xmtp/hex        ",
+            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            ..base_attr_changed(identity, None)
+        }];
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::zero());
+
+        for attr in attributes {
+            builder.attribute_event(attr).unwrap()
+        }
+        assert_eq!(builder.build(), Err(EthrBuilderError::MissingMetadata));
     }
 }
