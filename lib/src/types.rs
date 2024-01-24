@@ -452,6 +452,28 @@ mod test {
         );
         assert_eq!(String::from(KeyType::RsaVerificationKey2018), "RSA");
         assert_eq!(String::from(KeyType::X25519KeyAgreementKey2019), "X25519");
+
+        assert_eq!(
+            ServiceType::Messaging.to_string(),
+            "MessagingService".to_string()
+        );
+        assert_eq!(
+            ServiceType::Other("XMTP".into()).to_string(),
+            "XMTP".to_string()
+        );
+        assert_eq!(
+            KeyPurpose::VerificationKey.to_string(),
+            "veriKey".to_string()
+        );
+        assert_eq!(
+            KeyPurpose::SignatureAuthentication.to_string(),
+            "sigAuth".to_string()
+        );
+        assert_eq!(KeyPurpose::Encryption.to_string(), "enc".to_string());
+        assert_eq!(
+            String::from(KeyPurpose::VerificationKey),
+            "veriKey".to_string()
+        );
     }
 
     #[test]
@@ -466,5 +488,19 @@ mod test {
         t("did/pub/Secp256k1/xmtp/inst/hex ");
         t("did/pub/RSA/xmtp/inst/hex       ");
         t("did/pub/Ed25519/xmtp/inst/base64");
+    }
+
+    #[test]
+    fn test_attribute_to_string() {
+        let attr = Attribute::PublicKey(PublicKey {
+            key_type: KeyType::Ed25519VerificationKey2020,
+            purpose: KeyPurpose::VerificationKey,
+            metadata: None,
+            encoding: KeyEncoding::Base58,
+        });
+        assert_eq!(attr.to_string(), "did/pub/Ed25519/veriKey/base58");
+
+        let attr = Attribute::Other("test".into());
+        assert_eq!(attr.to_string(), "test".to_string());
     }
 }

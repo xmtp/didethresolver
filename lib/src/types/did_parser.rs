@@ -89,7 +89,6 @@ peg::parser! {
         rule encoding() -> KeyEncoding
             = i("hex") { KeyEncoding::Hex } / "base64" { KeyEncoding::Base64 } / "base58" { KeyEncoding::Base58 }
 
-
         rule messaging_service() -> ServiceType
             = i("MessagingService")  { ServiceType::Messaging }
 

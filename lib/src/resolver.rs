@@ -24,6 +24,7 @@ pub struct Resolver<M> {
 }
 
 impl<M: Middleware + 'static> Resolver<M> {
+    /// Instantiate a new did:ethr resolver
     pub async fn new(middleware: M, registry: Address) -> Result<Self, ResolverError<M>> {
         let signer = Arc::new(middleware);
         let registry = DIDRegistry::new(registry, signer.clone());
@@ -31,6 +32,7 @@ impl<M: Middleware + 'static> Resolver<M> {
         Ok(Self { signer, registry })
     }
 
+    /// Resolve a did:ethr identifier
     pub async fn resolve_did(
         &self,
         public_key: H160,
