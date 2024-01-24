@@ -300,9 +300,10 @@ pub async fn test_owner_revocation() -> Result<()> {
 pub async fn test_xmtp_revocation() -> Result<()> {
     with_client(None, |client, registry, signer, _| async move {
         let me = signer.address();
+        let attribute_name = *b"xmtp/installation/hex           ";
         let did = registry.set_attribute(
             me,
-            *b"did/pub/ed25519/xmtp/inst/hex   ",
+            attribute_name,
             b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
             U256::from(604_800),
         );
@@ -312,7 +313,7 @@ pub async fn test_xmtp_revocation() -> Result<()> {
         assert_eq!(
             document.verification_method[1].id,
             DidUrl::parse(format!(
-                "did:ethr:0x{}/xmtp?meta=installation_key#delegate-0",
+                "did:ethr:0x{}?meta=installation#xmtp-0",
                 hex::encode(me)
             ))
             .unwrap()
@@ -320,7 +321,7 @@ pub async fn test_xmtp_revocation() -> Result<()> {
 
         let did = registry.revoke_attribute(
             me,
-            *b"did/pub/ed25519/xmtp/inst/hex   ",
+            attribute_name,
             b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
         );
         did.send().await?.await?;
@@ -342,8 +343,7 @@ pub async fn test_xmtp_revocation() -> Result<()> {
 pub async fn test_signed_fns() -> Result<()> {
     with_client(None, |_, registry, _, anvil| async move {
         let me: LocalWallet = anvil.keys()[3].clone().into();
-
-        let name = *b"did/pub/Ed25519/xmtp/inst/hex   ";
+        let name = *b"xmtp/installation/hex           ";
         let value = b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71";
         let validity = U256::from(604_800);
         let signature = me

@@ -11,8 +11,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::{
-    Account, Attribute, DidDocument, DidUrl, KeyEncoding, KeyMetadata, KeyPurpose, KeyType,
-    PublicKey, Service, ServiceType, VerificationMethod, VerificationMethodProperties,
+    Account, Attribute, DidDocument, DidUrl, KeyEncoding, KeyPurpose, KeyType, PublicKey, Service,
+    ServiceType, VerificationMethod, VerificationMethodProperties,
 };
 use crate::{
     error::EthrBuilderError,
@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
-enum Key {
+pub(super) enum Key {
     Attribute {
         name: [u8; 32],
         value: Bytes,
@@ -43,22 +43,23 @@ enum Key {
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// DID Ethr Builder
 pub struct EthrBuilder {
-    context: Vec<Url>,
-    id: DidUrl,
-    also_known_as: Vec<DidUrl>,
-    controller: Option<DidUrl>,
-    verification_method: Vec<VerificationMethod>,
-    authentication: Vec<DidUrl>,
-    assertion_method: Vec<DidUrl>,
-    key_agreement: Vec<DidUrl>,
-    capability_invocation: Vec<DidUrl>,
-    capability_delegation: Vec<DidUrl>,
-    service: Vec<Service>,
-    delegate_count: usize,
-    service_count: usize,
-    is_deactivated: bool,
-    now: U256,
-    keys: HashMap<Key, usize>,
+    pub(super) context: Vec<Url>,
+    pub(super) id: DidUrl,
+    pub(super) also_known_as: Vec<DidUrl>,
+    pub(super) controller: Option<DidUrl>,
+    pub(super) verification_method: Vec<VerificationMethod>,
+    pub(super) authentication: Vec<DidUrl>,
+    pub(super) assertion_method: Vec<DidUrl>,
+    pub(super) key_agreement: Vec<DidUrl>,
+    pub(super) capability_invocation: Vec<DidUrl>,
+    pub(super) capability_delegation: Vec<DidUrl>,
+    pub(super) service: Vec<Service>,
+    pub(super) delegate_count: usize,
+    pub(super) service_count: usize,
+    pub(super) xmtp_count: usize,
+    pub(super) is_deactivated: bool,
+    pub(super) now: U256,
+    pub(super) keys: HashMap<Key, usize>,
 }
 
 impl Default for EthrBuilder {
@@ -80,6 +81,7 @@ impl Default for EthrBuilder {
             service: Default::default(),
             delegate_count: 0,
             service_count: 0,
+            xmtp_count: 0,
             now: U256::zero(),
             keys: Default::default(),
             is_deactivated: false,
@@ -185,8 +187,14 @@ impl EthrBuilder {
                 Attribute::Service(_) => {
                     self.service_count += 1;
                 }
+                Attribute::Xmtp(_) => {
+                    self.xmtp_count += 1;
+                }
                 Attribute::Other(_) => {
-                    log::trace!("Unhandled Attribute {name}:{}", event.value_string_lossy())
+                    log::warn!(
+                        "unhandled or malformed attribute {name}:{}",
+                        event.value_string_lossy()
+                    )
                 }
             };
         }
@@ -200,8 +208,15 @@ impl EthrBuilder {
                 self.keys.insert(key, self.service_count);
                 self.service_count += 1;
             }
+            Attribute::Xmtp(_) => {
+                self.keys.insert(key, self.xmtp_count);
+                self.xmtp_count += 1;
+            }
             Attribute::Other(_) => {
-                log::trace!("Unhandled Attribute {name}:{}", event.value_string_lossy())
+                log::warn!(
+                    "unhandled or malformed attribute {name}:{}",
+                    event.value_string_lossy()
+                )
             }
         };
 
@@ -261,24 +276,11 @@ impl EthrBuilder {
         let mut did = self.id.clone();
         did.set_fragment(Some(&format!("delegate-{}", index)));
 
-        let mut method = VerificationMethod {
+        let method = VerificationMethod {
             id: did,
             controller: self.id.clone(),
             verification_type: key.key_type,
-            verification_properties: None,
-        };
-
-        let value = hex::decode(value.as_ref())?;
-        method.verification_properties = match key.encoding {
-            KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
-                public_key_hex: hex::encode(value),
-            }),
-            KeyEncoding::Base64 => Some(VerificationMethodProperties::PublicKeyBase64 {
-                public_key_base64: BASE64.encode(value),
-            }),
-            KeyEncoding::Base58 => Some(VerificationMethodProperties::PublicKeyBase58 {
-                public_key_base58: bs58::encode(value).into_string(),
-            }),
+            verification_properties: Self::encode_attribute_value(value, key.encoding)?,
         };
 
         match key.purpose {
@@ -291,20 +293,29 @@ impl EthrBuilder {
             KeyPurpose::Encryption => {
                 self.key_agreement.push(method.id.clone());
             }
-            KeyPurpose::Xmtp => {
-                method.id.append_path("xmtp");
-                match key.metadata {
-                    Some(KeyMetadata::Installation) => {
-                        //TODO: Formalize XMTP metadata into typed enum
-                        method.id.set_query("meta", Some("installation_key"))
-                    }
-                    _ => return Err(EthrBuilderError::MissingMetadata),
-                }
-                self.authentication.push(method.id.clone());
-            }
         };
+
         self.verification_method.push(method.clone());
         Ok(())
+    }
+
+    /// Internal helper fn to encode a value into the correct format required by the DID Document.
+    pub(super) fn encode_attribute_value<V: AsRef<[u8]>>(
+        value: V,
+        encoding: KeyEncoding,
+    ) -> Result<Option<VerificationMethodProperties>, EthrBuilderError> {
+        let value = hex::decode(value.as_ref())?;
+        Ok(match encoding {
+            KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
+                public_key_hex: hex::encode(value),
+            }),
+            KeyEncoding::Base64 => Some(VerificationMethodProperties::PublicKeyBase64 {
+                public_key_base64: BASE64.encode(value),
+            }),
+            KeyEncoding::Base58 => Some(VerificationMethodProperties::PublicKeyBase58 {
+                public_key_base58: bs58::encode(value).into_string(),
+            }),
+        })
     }
 
     /// Adds a delegate to the document
@@ -409,6 +420,7 @@ impl EthrBuilder {
                     Attribute::Service(service) => {
                         self.service(index, value, service)?;
                     }
+                    Attribute::Xmtp(xmtp) => self.xmtp_key(index, value, xmtp)?,
                     Attribute::Other(_) => (),
                 },
                 Key::Delegate { delegate, purpose } => {
@@ -422,13 +434,16 @@ impl EthrBuilder {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::types::test::address;
 
     //TODO: dids are case-sensitive w.r.t their addresses. One did should equal the other, no
     //matter the case of the address (other than blockchain_account_id b/c of EIP55)
-    fn base_attr_changed(identity: Address, valid_to: Option<u32>) -> DidattributeChangedFilter {
+    pub fn base_attr_changed(
+        identity: Address,
+        valid_to: Option<u32>,
+    ) -> DidattributeChangedFilter {
         DidattributeChangedFilter {
             identity,
             previous_change: U256::zero(),
@@ -902,54 +917,5 @@ mod tests {
         builder.also_known_as(&other);
         builder.now(U256::zero());
         assert_eq!(builder.also_known_as[0], other);
-    }
-
-    #[test]
-    fn test_xmtp_keys() {
-        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
-        let attributes = vec![DidattributeChangedFilter {
-            name: *b"did/pub/ed25519/xmtp/inst/hex   ",
-            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
-            ..base_attr_changed(identity, None)
-        }];
-
-        let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
-        builder.now(U256::zero());
-
-        for attr in attributes {
-            builder.attribute_event(attr).unwrap()
-        }
-
-        let doc = builder.build().unwrap();
-
-        assert_eq!(
-            doc.verification_method[1].id.fragment().unwrap(),
-            "delegate-0"
-        );
-        assert_eq!(
-            doc.verification_method[1].id.query().unwrap(),
-            "meta=installation_key"
-        );
-        assert_eq!(doc.verification_method[1].id.path(), "/xmtp");
-    }
-
-    #[test]
-    fn test_xmtp_keys_no_metadata() {
-        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
-        let attributes = vec![DidattributeChangedFilter {
-            name: *b"did/pub/ed25519/xmtp/hex        ",
-            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
-            ..base_attr_changed(identity, None)
-        }];
-
-        let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
-        builder.now(U256::zero());
-
-        for attr in attributes {
-            builder.attribute_event(attr).unwrap()
-        }
-        assert_eq!(builder.build(), Err(EthrBuilderError::MissingMetadata));
     }
 }

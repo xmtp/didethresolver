@@ -81,10 +81,7 @@ peg::parser! {
             = kt:(secp256k1() / ed25519() / rsa() / x25519() ) { kt }
 
         rule key_purpose() -> KeyPurpose
-            = i("veriKey") { KeyPurpose::VerificationKey } / "sigAuth" { KeyPurpose::SignatureAuthentication } / "enc" { KeyPurpose::Encryption } / "xmtp" { KeyPurpose::Xmtp }
-
-        rule key_metadata() -> KeyMetadata
-            = i("inst") { KeyMetadata::Installation }
+            = i("veriKey") { KeyPurpose::VerificationKey } / "sigAuth" { KeyPurpose::SignatureAuthentication } / "enc" { KeyPurpose::Encryption }
 
         rule encoding() -> KeyEncoding
             = i("hex") { KeyEncoding::Hex } / "base64" { KeyEncoding::Base64 } / "base58" { KeyEncoding::Base58 }
@@ -98,24 +95,30 @@ peg::parser! {
         rule service() -> ServiceType
             = padding() "did/svc/" svc:(messaging_service() / other_service()) padding()  { svc }
 
-        rule public_key() -> (KeyType, KeyPurpose, Option<KeyMetadata>, KeyEncoding)
-            = padding() "did/pub/" kt:key_type() "/" kp:key_purpose() "/" me:metadata_and_encoding() padding() {
-                (kt, kp, me.0, me.1)
+        rule public_key() -> (KeyType, KeyPurpose, KeyEncoding)
+            = padding() "did/pub/" kt:key_type() "/" kp:key_purpose() "/" enc:encoding() padding() {
+                (kt, kp, enc)
             }
 
-        rule metadata_and_encoding() -> (Option<KeyMetadata>, KeyEncoding)
-            = km:key_metadata() "/" enc:encoding() { (Some(km), enc) } / enc:encoding() { (None, enc) }
+        rule xmtp_purpose() -> XmtpKeyPurpose
+            = "installation" { XmtpKeyPurpose::Installation }
+
+        rule xmtp() -> Attribute
+            = padding() "xmtp/" xmtp:xmtp_purpose() "/" enc:encoding() padding() { Attribute::Xmtp(XmtpAttribute { purpose: xmtp, encoding: enc })}
+
+        rule ethr() -> Attribute
+            = pk:public_key() {
+                let key = PublicKey { key_type: pk.0, purpose: pk.1, encoding: pk.2 };
+                Attribute::PublicKey(key)
+            }
+            / svc:service() { Attribute::Service(svc) }
 
         /// Parses the DID attribute name value
         ///
         /// Parses the `did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc|xmtp)/(hex|base64|base58)` part of a DID attribute name for adding a public key,
         /// or the `did/svc/[ServiceName]` part for adding a service
         pub rule attribute() -> Attribute
-            = pk:public_key() {
-                let key = PublicKey { key_type: pk.0, purpose: pk.1, metadata: pk.2, encoding: pk.3 };
-                Attribute::PublicKey(key)
-            }
-            / svc:service() { Attribute::Service(svc) }
+            = x:xmtp() { x } / e:ethr() { e }
         }
 }
 
@@ -186,12 +189,6 @@ mod tests {
             "did/pub/X25519/enc/hex",
             "did/pub/X25519/enc/base64",
             "did/pub/X25519/enc/base58",
-            "did/pub/ed25519/xmtp/inst/hex",
-            "did/pub/x25519/xmtp/inst/hex",
-            "did/pub/Secp256k1/xmtp/inst/hex",
-            "did/pub/RSA/xmtp/inst/hex",
-            "did/pub/ed25519/xmtp/inst/base64",
-            "did/pub/ed25519/xmtp/inst/base58",
             "did/svc/MessagingService",
         ];
 
@@ -199,6 +196,47 @@ mod tests {
             let parsed = parse_attribute(key);
             assert!(parsed.is_ok(), "Failed to parse key: {}", key);
         }
+    }
+
+    #[test]
+    fn test_did_xmtp_attribute_parser() {
+        let keys = [
+            "xmtp/installation/hex",
+            "xmtp/installation/base58",
+            "xmtp/installation/base64",
+        ];
+
+        for key in keys {
+            let parsed = parse_attribute(key);
+            assert!(parsed.is_ok(), "Failed to parse key: {}", key);
+        }
+    }
+
+    #[test]
+    fn test_xmtp_attribute_parses() {
+        assert_eq!(
+            parse_attribute("xmtp/installation/hex"),
+            Ok(Attribute::Xmtp(XmtpAttribute {
+                purpose: XmtpKeyPurpose::Installation,
+                encoding: KeyEncoding::Hex
+            }))
+        );
+
+        assert_eq!(
+            parse_attribute("xmtp/installation/base64"),
+            Ok(Attribute::Xmtp(XmtpAttribute {
+                purpose: XmtpKeyPurpose::Installation,
+                encoding: KeyEncoding::Base64,
+            }))
+        );
+
+        assert_eq!(
+            parse_attribute("xmtp/installation/base58"),
+            Ok(Attribute::Xmtp(XmtpAttribute {
+                purpose: XmtpKeyPurpose::Installation,
+                encoding: KeyEncoding::Base58
+            }))
+        );
     }
 
     #[test]

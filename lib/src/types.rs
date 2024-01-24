@@ -4,6 +4,7 @@
 mod did_parser;
 mod did_url;
 mod ethr;
+mod xmtp;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -12,6 +13,7 @@ use url::Url;
 pub use did_parser::*;
 pub use did_url::*;
 pub use ethr::*;
+pub use xmtp::*;
 
 /// The ethereum null addresss
 pub const NULL_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
@@ -191,26 +193,11 @@ impl From<KeyType> for String {
     }
 }
 
-/// Any extra key-specific metadata that could be ascribed to the key
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum KeyMetadata {
-    Installation,
-}
-
-impl fmt::Display for KeyMetadata {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            KeyMetadata::Installation => write!(f, "inst"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KeyPurpose {
     VerificationKey,
     SignatureAuthentication,
     Encryption,
-    Xmtp,
 }
 
 impl fmt::Display for KeyPurpose {
@@ -219,7 +206,6 @@ impl fmt::Display for KeyPurpose {
             KeyPurpose::VerificationKey => write!(f, "veriKey"),
             KeyPurpose::SignatureAuthentication => write!(f, "sigAuth"),
             KeyPurpose::Encryption => write!(f, "enc"),
-            KeyPurpose::Xmtp => write!(f, "xmtp"),
         }
     }
 }
@@ -236,28 +222,22 @@ pub enum Attribute {
     PublicKey(PublicKey),
     Service(ServiceType),
     Other(String),
+    Xmtp(XmtpAttribute),
 }
 
 impl fmt::Display for Attribute {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Attribute::PublicKey(key) => {
-                if let Some(metadata) = key.metadata {
-                    write!(
-                        f,
-                        "did/pub/{}/{}/{}/{}",
-                        key.key_type, key.purpose, metadata, key.encoding
-                    )
-                } else {
-                    write!(
-                        f,
-                        "did/pub/{}/{}/{}",
-                        key.key_type, key.purpose, key.encoding
-                    )
-                }
+                write!(
+                    f,
+                    "did/pub/{}/{}/{}",
+                    key.key_type, key.purpose, key.encoding
+                )
             }
             Attribute::Service(service) => write!(f, "did/svc/{}", service),
             Attribute::Other(other) => write!(f, "{}", other),
+            Attribute::Xmtp(xmtp) => write!(f, "xmtp/{}/{}", xmtp.purpose, xmtp.encoding),
         }
     }
 }
@@ -309,7 +289,6 @@ impl From<KeyEncoding> for String {
 pub struct PublicKey {
     pub key_type: KeyType,
     pub purpose: KeyPurpose,
-    pub metadata: Option<KeyMetadata>,
     pub encoding: KeyEncoding,
 }
 
@@ -483,11 +462,12 @@ mod test {
             let bytes: [u8; 32] = parsed.into();
             assert_eq!(String::from_utf8_lossy(&bytes), attribute);
         };
-        t("did/pub/Ed25519/xmtp/inst/base58");
+        t("xmtp/installation/base58        ");
+        t("xmtp/installation/hex           ");
+        t("xmtp/installation/base64        ");
+        t("did/pub/Ed25519/veriKey/base58  ");
+        t("did/pub/Secp256k1/veriKey/base64");
         t("did/svc/MessagingService        ");
-        t("did/pub/Secp256k1/xmtp/inst/hex ");
-        t("did/pub/RSA/xmtp/inst/hex       ");
-        t("did/pub/Ed25519/xmtp/inst/base64");
     }
 
     #[test]
@@ -495,7 +475,6 @@ mod test {
         let attr = Attribute::PublicKey(PublicKey {
             key_type: KeyType::Ed25519VerificationKey2020,
             purpose: KeyPurpose::VerificationKey,
-            metadata: None,
             encoding: KeyEncoding::Base58,
         });
         assert_eq!(attr.to_string(), "did/pub/Ed25519/veriKey/base58");
