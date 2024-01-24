@@ -7,12 +7,14 @@
 //!
 //!
 //! * `installation_key` adds a verification key to the `verificationMethod` section of the
-//! document and adds a reference to it in the `authentication` section.
+//! document and adds a reference to it in the `authentication` section. It also adds a
+//! `meta=installation` query to the DidUrl ID of the verification method and therefore the
+//! authentication reference.
 //!
-//! This format will be updated and changed according to the needs of the XMTP protocol. (currently
+//! *_NOTE:_* This format may be updated and changed according to the needs of the XMTP protocol. (currently
 //! in development)
 
-use super::{EthrBuilder, KeyEncoding, KeyType, VerificationMethod};
+use super::{Attribute, EthrBuilder, KeyEncoding, KeyType, VerificationMethod};
 use crate::error::EthrBuilderError;
 
 use std::fmt;
@@ -37,6 +39,12 @@ impl fmt::Display for XmtpAttribute {
 impl From<XmtpAttribute> for String {
     fn from(attr: XmtpAttribute) -> Self {
         attr.to_string()
+    }
+}
+
+impl From<XmtpAttribute> for Attribute {
+    fn from(attr: XmtpAttribute) -> Self {
+        Self::Xmtp(attr)
     }
 }
 
