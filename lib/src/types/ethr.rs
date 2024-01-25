@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
-enum Key {
+pub(super) enum Key {
     Attribute {
         name: [u8; 32],
         value: Bytes,
@@ -43,22 +43,42 @@ enum Key {
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// DID Ethr Builder
 pub struct EthrBuilder {
-    context: Vec<Url>,
-    id: DidUrl,
-    also_known_as: Vec<DidUrl>,
-    controller: Option<DidUrl>,
-    verification_method: Vec<VerificationMethod>,
-    authentication: Vec<DidUrl>,
-    assertion_method: Vec<DidUrl>,
-    key_agreement: Vec<DidUrl>,
-    capability_invocation: Vec<DidUrl>,
-    capability_delegation: Vec<DidUrl>,
-    service: Vec<Service>,
-    delegate_count: usize,
-    service_count: usize,
-    is_deactivated: bool,
-    now: U256,
-    keys: HashMap<Key, usize>,
+    /// Context of the DID
+    pub(super) context: Vec<Url>,
+    /// The DID
+    pub(super) id: DidUrl,
+    /// Aliases for the DID
+    pub(super) also_known_as: Vec<DidUrl>,
+    /// Controller of the DID
+    pub(super) controller: Option<DidUrl>,
+    /// Verification methods associated with the DID
+    pub(super) verification_method: Vec<VerificationMethod>,
+    /// Authentication methods associated with the DID
+    pub(super) authentication: Vec<DidUrl>,
+    /// Assertion methods associated with the DID
+    pub(super) assertion_method: Vec<DidUrl>,
+    /// Key agreement keys associated with the DID
+    pub(super) key_agreement: Vec<DidUrl>,
+    /// Invokers associated with the DID    
+    pub(super) capability_invocation: Vec<DidUrl>,
+    /// Delegates associated with the DID
+    pub(super) capability_delegation: Vec<DidUrl>,
+    /// External services associated with the DID
+    pub(super) service: Vec<Service>,
+    /// the index a new delegate should be assigned
+    pub(super) delegate_count: usize,
+    /// the index a new service should be assigned
+    pub(super) service_count: usize,
+    /// the index a new xmtp key should be assigned
+    pub(super) xmtp_count: usize,
+    /// whether the document has been deactivated
+    pub(super) is_deactivated: bool,
+    /// Current time for the document
+    pub(super) now: U256,
+    /// Map of keys to their index in the document
+    /// _*NOTE*_: this is used to ensure the order of keys is maintained, but indexes of the same
+    /// number are expected. (EX: a delegate and service both with index 0)
+    pub(super) keys: HashMap<Key, usize>,
 }
 
 impl Default for EthrBuilder {
@@ -80,6 +100,7 @@ impl Default for EthrBuilder {
             service: Default::default(),
             delegate_count: 0,
             service_count: 0,
+            xmtp_count: 0,
             now: U256::zero(),
             keys: Default::default(),
             is_deactivated: false,
@@ -135,7 +156,7 @@ impl EthrBuilder {
             purpose: key_purpose,
         };
 
-        if event.valid_to <= self.now {
+        if !event.is_valid(&self.now) {
             log::debug!("No Longer Valid {:?}", key);
             self.keys.remove(&key);
             return Ok(());
@@ -173,35 +194,36 @@ impl EthrBuilder {
             attribute: attribute.clone(),
         };
 
-        // invalid events still increment the counter, unless in the case of revocation
-        if event.valid_to <= self.now {
-            if self.keys.remove(&key).is_some() {
-                return Ok(());
-            }
-            match attribute {
-                Attribute::PublicKey(_) => {
-                    self.delegate_count += 1;
-                }
-                Attribute::Service(_) => {
-                    self.service_count += 1;
-                }
-                Attribute::Other(_) => {
-                    log::trace!("Unhandled Attribute {name}:{}", event.value_string_lossy())
-                }
-            };
+        // if the event is invalid, and the key exists, it means this attribute changed event
+        // is revoking the key
+        if !event.is_valid(&self.now) && self.keys.remove(&key).is_some() {
+            return Ok(());
         }
 
         match attribute {
             Attribute::PublicKey(_) => {
-                self.keys.insert(key, self.delegate_count);
+                if event.is_valid(&self.now) {
+                    self.keys.insert(key, self.delegate_count);
+                }
                 self.delegate_count += 1;
             }
             Attribute::Service(_) => {
-                self.keys.insert(key, self.service_count);
+                if event.is_valid(&self.now) {
+                    self.keys.insert(key, self.service_count);
+                }
                 self.service_count += 1;
             }
+            Attribute::Xmtp(_) => {
+                if event.is_valid(&self.now) {
+                    self.keys.insert(key, self.xmtp_count);
+                }
+                self.xmtp_count += 1;
+            }
             Attribute::Other(_) => {
-                log::trace!("Unhandled Attribute {name}:{}", event.value_string_lossy())
+                log::warn!(
+                    "unhandled or malformed attribute name=`{name}`,value=`{}`",
+                    event.value_string_lossy()
+                )
             }
         };
 
@@ -261,27 +283,13 @@ impl EthrBuilder {
         let mut did = self.id.clone();
         did.set_fragment(Some(&format!("delegate-{}", index)));
 
-        let mut method = VerificationMethod {
+        let method = VerificationMethod {
             id: did,
             controller: self.id.clone(),
             verification_type: key.key_type,
-            verification_properties: None,
+            verification_properties: Self::encode_attribute_value(value, key.encoding)?,
         };
 
-        let value = hex::decode(value.as_ref())?;
-        method.verification_properties = match key.encoding {
-            KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
-                public_key_hex: hex::encode(value),
-            }),
-            KeyEncoding::Base64 => Some(VerificationMethodProperties::PublicKeyBase64 {
-                public_key_base64: BASE64.encode(value),
-            }),
-            KeyEncoding::Base58 => Some(VerificationMethodProperties::PublicKeyBase58 {
-                public_key_base58: bs58::encode(value).into_string(),
-            }),
-        };
-
-        self.verification_method.push(method.clone());
         match key.purpose {
             KeyPurpose::SignatureAuthentication => {
                 self.authentication.push(method.id.clone());
@@ -293,7 +301,28 @@ impl EthrBuilder {
                 self.key_agreement.push(method.id.clone());
             }
         };
+
+        self.verification_method.push(method.clone());
         Ok(())
+    }
+
+    /// Internal helper fn to encode a value into the correct format required by the DID Document.
+    pub(super) fn encode_attribute_value<V: AsRef<[u8]>>(
+        value: V,
+        encoding: KeyEncoding,
+    ) -> Result<Option<VerificationMethodProperties>, EthrBuilderError> {
+        let value = hex::decode(value.as_ref())?;
+        Ok(match encoding {
+            KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
+                public_key_hex: hex::encode(value),
+            }),
+            KeyEncoding::Base64 => Some(VerificationMethodProperties::PublicKeyBase64 {
+                public_key_base64: BASE64.encode(value),
+            }),
+            KeyEncoding::Base58 => Some(VerificationMethodProperties::PublicKeyBase58 {
+                public_key_base58: bs58::encode(value).into_string(),
+            }),
+        })
     }
 
     /// Adds a delegate to the document
@@ -398,6 +427,7 @@ impl EthrBuilder {
                     Attribute::Service(service) => {
                         self.service(index, value, service)?;
                     }
+                    Attribute::Xmtp(xmtp) => self.xmtp_key(index, value, xmtp)?,
                     Attribute::Other(_) => (),
                 },
                 Key::Delegate { delegate, purpose } => {
@@ -411,13 +441,16 @@ impl EthrBuilder {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::types::test::address;
 
     //TODO: dids are case-sensitive w.r.t their addresses. One did should equal the other, no
     //matter the case of the address (other than blockchain_account_id b/c of EIP55)
-    fn base_attr_changed(identity: Address, valid_to: Option<u32>) -> DidattributeChangedFilter {
+    pub fn base_attr_changed(
+        identity: Address,
+        valid_to: Option<u32>,
+    ) -> DidattributeChangedFilter {
         DidattributeChangedFilter {
             identity,
             previous_change: U256::zero(),
@@ -552,7 +585,7 @@ mod tests {
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
-                name: *b"did/pub/Secp256k1/veriKey/base58",
+                name: *b"did/pub/Secp256k1/sigAuth/base58",
                 value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
                 ..base_attr_changed(identity, None)
             },
@@ -804,7 +837,7 @@ mod tests {
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
-                name: *b"did/pub/Secp256k1/veriKey/base58",
+                name: *b"did/pub/Secp256k1/sigAuth/base58",
                 value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
                 ..base_attr_changed(identity, None)
             },
@@ -891,5 +924,26 @@ mod tests {
         builder.also_known_as(&other);
         builder.now(U256::zero());
         assert_eq!(builder.also_known_as[0], other);
+    }
+
+    #[test]
+    fn test_other_attribute() {
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let event = DidattributeChangedFilter {
+            name: *b"test/random/attribute99999999   ",
+            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            ..base_attr_changed(identity, None)
+        };
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::zero());
+
+        builder.attribute_event(event).unwrap();
+
+        let doc = builder.build().unwrap();
+
+        // no events should have been registered
+        assert_eq!(doc.verification_method.len(), 1);
     }
 }

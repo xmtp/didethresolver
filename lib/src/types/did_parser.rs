@@ -86,7 +86,6 @@ peg::parser! {
         rule encoding() -> KeyEncoding
             = i("hex") { KeyEncoding::Hex } / "base64" { KeyEncoding::Base64 } / "base58" { KeyEncoding::Base58 }
 
-
         rule messaging_service() -> ServiceType
             = i("MessagingService")  { ServiceType::Messaging }
 
@@ -101,16 +100,27 @@ peg::parser! {
                 (kt, kp, enc)
             }
 
-        /// Parses the DID attribute name value
-        ///
-        /// Parses the `did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc)/(hex|base64|base58)` part of a DID attribute name for adding a public key,
-        /// or the `did/svc/[ServiceName]` part for adding a service
-        pub rule attribute() -> Attribute
+        rule xmtp_purpose() -> XmtpKeyPurpose
+            = "installation" { XmtpKeyPurpose::Installation }
+
+        rule xmtp() -> Attribute
+            = padding() "xmtp/" xmtp:xmtp_purpose() "/" enc:encoding() padding() { Attribute::Xmtp(XmtpAttribute { purpose: xmtp, encoding: enc })}
+
+        rule ethr() -> Attribute
             = pk:public_key() {
                 let key = PublicKey { key_type: pk.0, purpose: pk.1, encoding: pk.2 };
                 Attribute::PublicKey(key)
             }
             / svc:service() { Attribute::Service(svc) }
+
+        /// Parses the DID attribute name value
+        ///
+        /// Parses
+        /// *`did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc|xmtp)/(hex|base64|base58)` part of a DID attribute name for adding a public key,
+        /// * `did/svc/[ServiceName]` part for adding a service
+        /// * `xmtp/installation/(hex|base64|base58)` attribute for adding an xmtp installation key
+        pub rule attribute() -> Attribute
+            = x:xmtp() { x } / e:ethr() { e }
         }
 }
 
@@ -188,6 +198,47 @@ mod tests {
             let parsed = parse_attribute(key);
             assert!(parsed.is_ok(), "Failed to parse key: {}", key);
         }
+    }
+
+    #[test]
+    fn test_did_xmtp_attribute_parser() {
+        let keys = [
+            "xmtp/installation/hex",
+            "xmtp/installation/base58",
+            "xmtp/installation/base64",
+        ];
+
+        for key in keys {
+            let parsed = parse_attribute(key);
+            assert!(parsed.is_ok(), "Failed to parse key: {}", key);
+        }
+    }
+
+    #[test]
+    fn test_xmtp_attribute_parses() {
+        assert_eq!(
+            parse_attribute("xmtp/installation/hex"),
+            Ok(Attribute::Xmtp(XmtpAttribute {
+                purpose: XmtpKeyPurpose::Installation,
+                encoding: KeyEncoding::Hex
+            }))
+        );
+
+        assert_eq!(
+            parse_attribute("xmtp/installation/base64"),
+            Ok(Attribute::Xmtp(XmtpAttribute {
+                purpose: XmtpKeyPurpose::Installation,
+                encoding: KeyEncoding::Base64,
+            }))
+        );
+
+        assert_eq!(
+            parse_attribute("xmtp/installation/base58"),
+            Ok(Attribute::Xmtp(XmtpAttribute {
+                purpose: XmtpKeyPurpose::Installation,
+                encoding: KeyEncoding::Base58
+            }))
+        );
     }
 
     #[test]

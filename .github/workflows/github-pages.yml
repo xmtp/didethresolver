@@ -1,25 +1,21 @@
 name: GitHub Pages
-
 on:
   workflow_run:
     workflows: ["Build Dev Image CI"]
     branches: ["main"]
-    types: 
+    types:
       - completed
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-  
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
-
 # Allow one concurrent deployment
 concurrency:
   group: "github-pages"
   cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,25 +24,21 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
-
       - name: Setup Pages
         uses: actions/configure-pages@v2
       - uses: actions/setup-python@v2
-
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
-
       - name: Run tests
         env:
           CARGO_INCREMENTAL: 0
         run: |
           cargo test --workspace --all-features --tests tests
         id: test
-
       - name: Invoke cargo doc
         run: |
           rm -rf ./_site
@@ -57,10 +49,8 @@ jobs:
           echo "Taking care of pedantic permissions requirements required by GitHub Pages"
           chmod -R +rX _site
         id: docgen
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
-
   # Deployment job
   deploy:
     environment:

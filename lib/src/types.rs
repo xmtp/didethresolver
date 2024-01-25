@@ -4,13 +4,16 @@
 mod did_parser;
 mod did_url;
 mod ethr;
+mod xmtp;
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use url::Url;
 
 pub use did_parser::*;
 pub use did_url::*;
 pub use ethr::*;
+pub use xmtp::*;
 
 /// The ethereum null addresss
 pub const NULL_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
@@ -145,6 +148,21 @@ pub enum ServiceType {
     Other(String),
 }
 
+impl fmt::Display for ServiceType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ServiceType::Messaging => write!(f, "MessagingService"),
+            ServiceType::Other(other) => write!(f, "{}", other),
+        }
+    }
+}
+
+impl From<ServiceType> for String {
+    fn from(t: ServiceType) -> Self {
+        t.to_string()
+    }
+}
+
 /// Various cryptographic key types defined in the [DID Specification](https://www.w3.org/TR/did-spec-registries/#verification-method-types)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum KeyType {
@@ -156,16 +174,22 @@ pub enum KeyType {
     X25519KeyAgreementKey2019,
 }
 
-impl From<KeyType> for String {
-    fn from(kt: KeyType) -> String {
-        match kt {
-            KeyType::JsonWebKey2020 => "jwk".into(),
-            KeyType::Ed25519VerificationKey2020 => "Ed25519".into(),
-            KeyType::EcdsaSecp256k1RecoveryMethod2020 => "Secp256k1".into(),
-            KeyType::EcdsaSecp256k1VerificationKey2019 => "Secp256k1".into(),
-            KeyType::RsaVerificationKey2018 => "RSA".into(),
-            KeyType::X25519KeyAgreementKey2019 => "X25519".into(),
+impl fmt::Display for KeyType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeyType::JsonWebKey2020 => write!(f, "jwk"),
+            KeyType::Ed25519VerificationKey2020 => write!(f, "Ed25519"),
+            KeyType::EcdsaSecp256k1RecoveryMethod2020 => write!(f, "Secp256k1"),
+            KeyType::EcdsaSecp256k1VerificationKey2019 => write!(f, "Secp256k1"),
+            KeyType::RsaVerificationKey2018 => write!(f, "RSA"),
+            KeyType::X25519KeyAgreementKey2019 => write!(f, "X25519"),
         }
+    }
+}
+
+impl From<KeyType> for String {
+    fn from(t: KeyType) -> Self {
+        t.to_string()
     }
 }
 
@@ -176,23 +200,19 @@ pub enum KeyPurpose {
     Encryption,
 }
 
-impl From<KeyPurpose> for String {
-    fn from(purpose: KeyPurpose) -> String {
-        match purpose {
-            KeyPurpose::VerificationKey => "veriKey".into(),
-            KeyPurpose::SignatureAuthentication => "sigAuth".into(),
-            KeyPurpose::Encryption => "enc".into(),
+impl fmt::Display for KeyPurpose {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeyPurpose::VerificationKey => write!(f, "veriKey"),
+            KeyPurpose::SignatureAuthentication => write!(f, "sigAuth"),
+            KeyPurpose::Encryption => write!(f, "enc"),
         }
     }
 }
 
-impl From<KeyEncoding> for String {
-    fn from(enc: KeyEncoding) -> String {
-        match enc {
-            KeyEncoding::Hex => "hex".into(),
-            KeyEncoding::Base64 => "base64".into(),
-            KeyEncoding::Base58 => "base58".into(),
-        }
+impl From<KeyPurpose> for String {
+    fn from(purpose: KeyPurpose) -> String {
+        purpose.to_string()
     }
 }
 
@@ -202,6 +222,43 @@ pub enum Attribute {
     PublicKey(PublicKey),
     Service(ServiceType),
     Other(String),
+    Xmtp(XmtpAttribute),
+}
+
+impl fmt::Display for Attribute {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Attribute::PublicKey(key) => {
+                write!(
+                    f,
+                    "did/pub/{}/{}/{}",
+                    key.key_type, key.purpose, key.encoding
+                )
+            }
+            Attribute::Service(service) => write!(f, "did/svc/{}", service),
+            Attribute::Other(other) => write!(f, "{}", other),
+            Attribute::Xmtp(xmtp) => write!(f, "xmtp/{}/{}", xmtp.purpose, xmtp.encoding),
+        }
+    }
+}
+
+impl From<Attribute> for String {
+    fn from(attr: Attribute) -> String {
+        attr.to_string()
+    }
+}
+
+// fills a [u8; 32] with bytes from the resulting Attribute String.
+// Attribute strings should never be greater than 32 bytes, but if it is, anything over 32 bytes
+// will be cutoff.
+impl From<Attribute> for [u8; 32] {
+    fn from(attribute: Attribute) -> [u8; 32] {
+        let mut attr_bytes: [u8; 32] = [b' '; 32];
+        let attr_string = attribute.to_string();
+        let length = std::cmp::min(attr_string.as_bytes().len(), 32);
+        attr_bytes[0..length].copy_from_slice(&attr_string.as_bytes()[0..length]);
+        attr_bytes
+    }
 }
 
 /// Indicates the encoding of a key in a did:ethr attribute
@@ -212,12 +269,33 @@ pub enum KeyEncoding {
     Base58,
 }
 
+impl fmt::Display for KeyEncoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KeyEncoding::Hex => write!(f, "hex"),
+            KeyEncoding::Base64 => write!(f, "base64"),
+            KeyEncoding::Base58 => write!(f, "base58"),
+        }
+    }
+}
+impl From<KeyEncoding> for String {
+    fn from(enc: KeyEncoding) -> String {
+        enc.to_string()
+    }
+}
+
 /// Indicates the Public Key Type, Purpose, and Encoding from a did:ethr attribute name
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PublicKey {
     pub key_type: KeyType,
     pub purpose: KeyPurpose,
     pub encoding: KeyEncoding,
+}
+
+impl From<PublicKey> for Attribute {
+    fn from(key: PublicKey) -> Self {
+        Attribute::PublicKey(key)
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, Eq)]
@@ -353,5 +431,118 @@ mod test {
         );
         assert_eq!(String::from(KeyType::RsaVerificationKey2018), "RSA");
         assert_eq!(String::from(KeyType::X25519KeyAgreementKey2019), "X25519");
+
+        assert_eq!(
+            ServiceType::Messaging.to_string(),
+            "MessagingService".to_string()
+        );
+        assert_eq!(
+            ServiceType::Other("XMTP".into()).to_string(),
+            "XMTP".to_string()
+        );
+        assert_eq!(
+            KeyPurpose::VerificationKey.to_string(),
+            "veriKey".to_string()
+        );
+        assert_eq!(
+            KeyPurpose::SignatureAuthentication.to_string(),
+            "sigAuth".to_string()
+        );
+        assert_eq!(KeyPurpose::Encryption.to_string(), "enc".to_string());
+        assert_eq!(
+            String::from(KeyPurpose::VerificationKey),
+            "veriKey".to_string()
+        );
+    }
+
+    #[test]
+    fn test_attribute_to_bytes() {
+        let t = |attribute: &str| {
+            let parsed: Attribute = parse_attribute(attribute).unwrap();
+            let bytes: [u8; 32] = parsed.into();
+            assert_eq!(String::from_utf8_lossy(&bytes), attribute);
+        };
+        t("xmtp/installation/base58        ");
+        t("xmtp/installation/hex           ");
+        t("xmtp/installation/base64        ");
+        t("did/pub/Ed25519/veriKey/base58  ");
+        t("did/pub/Secp256k1/veriKey/base64");
+        t("did/svc/MessagingService        ");
+    }
+
+    #[test]
+    fn test_attribute_to_string() {
+        let attr = Attribute::PublicKey(PublicKey {
+            key_type: KeyType::Ed25519VerificationKey2020,
+            purpose: KeyPurpose::VerificationKey,
+            encoding: KeyEncoding::Base58,
+        });
+        assert_eq!(attr.to_string(), "did/pub/Ed25519/veriKey/base58");
+
+        let attr = Attribute::Other("test".into());
+        assert_eq!(attr.to_string(), "test".to_string());
+    }
+
+    #[test]
+    fn test_service_str() {
+        let service = ServiceType::Messaging;
+        assert_eq!(String::from(service), "MessagingService".to_string());
+        let service = ServiceType::Other("test".to_string());
+        assert_eq!(String::from(service), "test".to_string());
+    }
+
+    #[test]
+    fn test_attribute_str() {
+        let attr = Attribute::PublicKey(PublicKey {
+            key_type: KeyType::Ed25519VerificationKey2020,
+            purpose: KeyPurpose::VerificationKey,
+            encoding: KeyEncoding::Base58,
+        });
+        assert_eq!(
+            String::from(attr),
+            "did/pub/Ed25519/veriKey/base58".to_string()
+        );
+
+        let attr = Attribute::Other("test".into());
+        assert_eq!(String::from(attr), "test".to_string());
+
+        let attr = Attribute::Service(ServiceType::Messaging);
+        assert_eq!(String::from(attr), "did/svc/MessagingService".to_string());
+
+        let attr = Attribute::Xmtp(XmtpAttribute {
+            purpose: XmtpKeyPurpose::Installation,
+            encoding: KeyEncoding::Base58,
+        });
+        assert_eq!(String::from(attr), "xmtp/installation/base58".to_string());
+    }
+
+    #[test]
+    fn public_key_conversion() {
+        let key = PublicKey {
+            key_type: KeyType::Ed25519VerificationKey2020,
+            purpose: KeyPurpose::VerificationKey,
+            encoding: KeyEncoding::Base58,
+        };
+        let attr: Attribute = key.into();
+        assert_eq!(
+            attr,
+            Attribute::PublicKey(PublicKey {
+                key_type: KeyType::Ed25519VerificationKey2020,
+                purpose: KeyPurpose::VerificationKey,
+                encoding: KeyEncoding::Base58,
+            })
+        );
+    }
+
+    #[test]
+    fn test_encoding_str() {
+        let encoding = KeyEncoding::Hex;
+        assert_eq!(String::from(encoding), "hex".to_string());
+
+        let encoding = KeyEncoding::Base64;
+        assert_eq!(String::from(encoding), "base64".to_string());
+
+        let encoding = KeyEncoding::Base58;
+        assert_eq!(String::from(encoding), "base58".to_string());
     }
 }

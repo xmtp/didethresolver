@@ -24,6 +24,7 @@ pub struct Resolver<M> {
 }
 
 impl<M: Middleware + 'static> Resolver<M> {
+    /// Instantiate a new did:ethr resolver
     pub async fn new(middleware: M, registry: Address) -> Result<Self, ResolverError<M>> {
         let signer = Arc::new(middleware);
         let registry = DIDRegistry::new(registry, signer.clone());
@@ -31,6 +32,7 @@ impl<M: Middleware + 'static> Resolver<M> {
         Ok(Self { signer, registry })
     }
 
+    /// Resolve a did:ethr identifier
     pub async fn resolve_did(
         &self,
         public_key: H160,
@@ -53,6 +55,8 @@ impl<M: Middleware + 'static> Resolver<M> {
             .as_u64()
             .into();
 
+        log::trace!("Previous Change for {}: {:?}", public_key, previous_change);
+
         let mut history = Vec::new();
 
         loop {
@@ -70,6 +74,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                 .await?;
 
             for (event, meta) in events {
+                log::trace!("Adding {:?} event to history", event);
                 if event.previous_change() < previous_change {
                     previous_change = event.previous_change();
                 }
@@ -90,12 +95,15 @@ impl<M: Middleware + 'static> Resolver<M> {
     ) {
         let res = match event {
             DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
+                log::trace!("Delegate Changed {:?}", delegate_changed);
                 doc.delegate_event(delegate_changed)
             }
             DIDRegistryEvents::DidattributeChangedFilter(attribute_event) => {
+                log::trace!("Attribute Changed {:?}", attribute_event);
                 doc.attribute_event(attribute_event)
             }
             DIDRegistryEvents::DidownerChangedFilter(owner_changed) => {
+                log::trace!("Owner Changed {:?}", owner_changed);
                 doc.owner_event(owner_changed)
             }
         };

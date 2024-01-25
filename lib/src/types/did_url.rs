@@ -236,6 +236,11 @@ impl DidUrl {
         self.query.as_deref()
     }
 
+    pub fn set_query(&mut self, key: &str, value: Option<&str>) {
+        let query = format!("{}={}", key, value.unwrap_or(""));
+        self.query = Some(query);
+    }
+
     /// Returns this DID's fragment identifier, if any.
     ///  A fragment is the part of the URL after the # symbol. The fragment is optional and, if present, contains a fragment identifier that identifies a secondary resource, such as a section heading of a document.
     ///
@@ -277,9 +282,6 @@ impl DidUrl {
 
     /// Change this DID's path
     ///
-    /// # Returns
-    /// A Result indicating if the path was successfully set.
-    ///
     /// # Examples
     /// ```
     /// use lib_didethresolver::types::DidUrl;
@@ -288,9 +290,6 @@ impl DidUrl {
     /// did_url.set_path("/path/to/resource");
     /// assert_eq!(did_url.path, "/path/to/resource");
     /// ```
-    ///
-    /// # Errors
-    /// returns a [`DidError`] if the parsing of the URI fails because it is not the expected format or if the method is unsupported.
     ///
     pub fn set_path(&mut self, path: &str) {
         self.path = path.to_string();
