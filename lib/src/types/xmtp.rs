@@ -165,4 +165,32 @@ mod test {
         assert_eq!(doc.verification_method.len(), 1);
         assert_eq!(doc.authentication.len(), 0);
     }
+
+    #[test]
+    fn test_xmtp_attribute_string() {
+        let attr = XmtpAttribute {
+            purpose: XmtpKeyPurpose::Installation,
+            encoding: KeyEncoding::Hex,
+        };
+
+        assert_eq!(attr.to_string(), "xmtp/installation/hex");
+        assert_eq!(String::from(attr), "xmtp/installation/hex");
+    }
+
+    #[test]
+    fn test_xmtp_attr_conversion() {
+        let attr = XmtpAttribute {
+            purpose: XmtpKeyPurpose::Installation,
+            encoding: KeyEncoding::Hex,
+        };
+
+        assert_eq!(Attribute::from(attr.clone()), Attribute::Xmtp(attr));
+    }
+
+    #[test]
+    fn test_key_purpose_string() {
+        let purpose = XmtpKeyPurpose::Installation;
+        assert_eq!(purpose.to_string(), "installation");
+        assert_eq!(String::from(purpose), "installation");
+    }
 }
