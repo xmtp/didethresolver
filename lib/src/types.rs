@@ -486,7 +486,7 @@ mod test {
     #[test]
     fn test_service_str() {
         let service = ServiceType::Messaging;
-        assert_eq!(String::from(service), "Messaging".to_string());
+        assert_eq!(String::from(service), "MessagingService".to_string());
         let service = ServiceType::Other("test".to_string());
         assert_eq!(String::from(service), "test".to_string());
     }
