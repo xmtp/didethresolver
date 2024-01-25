@@ -34,6 +34,7 @@ impl DIDRegistryEvents {
         }
     }
 
+    /// Check if a [`DIDRegistryEvents`] is valid at a given time.
     pub fn is_valid(&self, now: &U256) -> bool {
         match self {
             DIDRegistryEvents::DidattributeChangedFilter(attribute_changed) => {
@@ -48,20 +49,24 @@ impl DIDRegistryEvents {
 }
 
 impl DidattributeChangedFilter {
+    /// Get the value of the attribute as a string. non-UTF8 bytes will be replaced with the unicode replacement character, �.
     pub fn value_string_lossy(&self) -> String {
         String::from_utf8_lossy(self.value.as_ref()).to_string()
     }
 
+    /// Get the name of the attribute as a string. non-UTF8 bytes will be replaced with the unicode replacement character, �.
     pub fn name_string_lossy(&self) -> String {
         String::from_utf8_lossy(self.name.as_ref()).to_string()
     }
 
+    /// Check if a [`DidattributeChangedFilter`] is valid at a given time.
     pub fn is_valid(&self, now: &U256) -> bool {
         self.valid_to > *now
     }
 }
 
 impl DiddelegateChangedFilter {
+    /// Check if a [`DiddelegateChangedFilter`] is valid at a given time.
     pub fn is_valid(&self, now: &U256) -> bool {
         self.valid_to > *now
     }
