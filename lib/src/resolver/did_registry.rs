@@ -234,3 +234,34 @@ pub fn keccak256<T: AsRef<[u8]>>(bytes: T) -> [u8; 32] {
 
     output
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_delegate_is_valid() {
+        let event = DiddelegateChangedFilter {
+            identity: Address::zero(),
+            delegate_type: [0; 32],
+            delegate: Address::zero(),
+            valid_to: U256::from(100),
+            previous_change: U256::from(0),
+        };
+        assert!(event.is_valid(&U256::from(0)));
+        assert!(!event.is_valid(&U256::from(100)));
+    }
+
+    #[test]
+    fn test_attribute_is_valid() {
+        let event = DidattributeChangedFilter {
+            identity: Address::zero(),
+            name: [0; 32],
+            value: vec![0].into(),
+            valid_to: U256::from(100),
+            previous_change: U256::from(0),
+        };
+        assert!(event.is_valid(&U256::from(0)));
+        assert!(!event.is_valid(&U256::from(100)));
+    }
+}
