@@ -482,4 +482,55 @@ mod test {
         let attr = Attribute::Other("test".into());
         assert_eq!(attr.to_string(), "test".to_string());
     }
+
+    #[test]
+    fn test_service_str() {
+        let service = ServiceType::Messaging;
+        assert_eq!(String::from(service), "Messaging".to_string());
+        let service = ServiceType::Other("test".to_string());
+        assert_eq!(String::from(service), "test".to_string());
+    }
+
+    #[test]
+    fn test_attribute_str() {
+        let attr = Attribute::PublicKey(PublicKey {
+            key_type: KeyType::Ed25519VerificationKey2020,
+            purpose: KeyPurpose::VerificationKey,
+            encoding: KeyEncoding::Base58,
+        });
+        assert_eq!(
+            String::from(attr),
+            "did/pub/Ed25519/veriKey/base58".to_string()
+        );
+
+        let attr = Attribute::Other("test".into());
+        assert_eq!(String::from(attr), "test".to_string());
+
+        let attr = Attribute::Service(ServiceType::Messaging);
+        assert_eq!(String::from(attr), "did/svc/MessagingService".to_string());
+
+        let attr = Attribute::Xmtp(XmtpAttribute {
+            purpose: XmtpKeyPurpose::Installation,
+            encoding: KeyEncoding::Base58,
+        });
+        assert_eq!(String::from(attr), "xmtp/installation/base58".to_string());
+    }
+
+    #[test]
+    fn public_key_conversion() {
+        let key = PublicKey {
+            key_type: KeyType::Ed25519VerificationKey2020,
+            purpose: KeyPurpose::VerificationKey,
+            encoding: KeyEncoding::Base58,
+        };
+        let attr: Attribute = key.into();
+        assert_eq!(
+            attr,
+            Attribute::PublicKey(PublicKey {
+                key_type: KeyType::Ed25519VerificationKey2020,
+                purpose: KeyPurpose::VerificationKey,
+                encoding: KeyEncoding::Base58,
+            })
+        );
+    }
 }
