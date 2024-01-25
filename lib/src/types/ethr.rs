@@ -221,7 +221,7 @@ impl EthrBuilder {
             }
             Attribute::Other(_) => {
                 log::warn!(
-                    "unhandled or malformed attribute {name}:{}",
+                    "unhandled or malformed attribute name=`{name}`,value=`{}`",
                     event.value_string_lossy()
                 )
             }
@@ -924,5 +924,26 @@ pub(crate) mod tests {
         builder.also_known_as(&other);
         builder.now(U256::zero());
         assert_eq!(builder.also_known_as[0], other);
+    }
+
+    #[test]
+    fn test_other_attribute() {
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let event = DidattributeChangedFilter {
+            name: *b"test/random/attribute99999999   ",
+            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            ..base_attr_changed(identity, None)
+        };
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::zero());
+
+        builder.attribute_event(event).unwrap();
+
+        let doc = builder.build().unwrap();
+
+        // no events should have been registered
+        assert_eq!(doc.verification_method.len(), 1);
     }
 }
