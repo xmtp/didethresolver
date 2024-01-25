@@ -115,8 +115,10 @@ peg::parser! {
 
         /// Parses the DID attribute name value
         ///
-        /// Parses the `did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc|xmtp)/(hex|base64|base58)` part of a DID attribute name for adding a public key,
-        /// or the `did/svc/[ServiceName]` part for adding a service
+        /// Parses
+        /// *`did/pub/(Secp256k1|RSA|Ed25519|X25519)/(veriKey|sigAuth|enc|xmtp)/(hex|base64|base58)` part of a DID attribute name for adding a public key,
+        /// * `did/svc/[ServiceName]` part for adding a service
+        /// * `xmtp/installation/(hex|base64|base58)` attribute for adding an xmtp installation key
         pub rule attribute() -> Attribute
             = x:xmtp() { x } / e:ethr() { e }
         }
