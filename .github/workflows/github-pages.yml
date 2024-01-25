@@ -1,7 +1,10 @@
 name: GitHub Pages
 on:
-  push:
+  workflow_run:
+    workflows: ["Build Dev Image CI"]
     branches: ["main"]
+    types:
+      - completed
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
@@ -30,11 +33,11 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
       - name: Run tests
+        env:
+          CARGO_INCREMENTAL: 0
         run: |
-          cargo test --all-features
+          cargo test --workspace --all-features --tests tests
         id: test
       - name: Invoke cargo doc
         run: |
