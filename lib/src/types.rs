@@ -533,4 +533,16 @@ mod test {
             })
         );
     }
+
+    #[test]
+    fn test_encoding_str() {
+        let encoding = KeyEncoding::Hex;
+        assert_eq!(String::from(encoding), "hex".to_string());
+
+        let encoding = KeyEncoding::Base64;
+        assert_eq!(String::from(encoding), "base64".to_string());
+
+        let encoding = KeyEncoding::Base58;
+        assert_eq!(String::from(encoding), "base58".to_string());
+    }
 }
