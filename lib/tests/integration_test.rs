@@ -175,6 +175,21 @@ pub async fn test_delegate() -> Result<()> {
             })
         );
 
+        assert_eq!(
+            resolution_response.document.verification_method[2].id,
+            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+        );
+        assert_eq!(
+            resolution_response.document.verification_method[2].controller,
+            DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
+        );
+        assert_eq!(
+            resolution_response.document.verification_method[2].verification_properties,
+            Some(VerificationMethodProperties::BlockchainAccountId {
+                blockchain_account_id: format!("0x{}", hex::encode(delegate.address()))
+            })
+        );
+
         Ok(())
     })
     .await

@@ -81,6 +81,7 @@ impl EthrBuilder {
         let mut did = self.id.clone();
         did.set_fragment(Some(&format!("xmtp-{}", index)));
 
+        log::debug!("index: {}", index);
         let mut method = VerificationMethod {
             id: did,
             controller: self.id.clone(),
@@ -138,5 +139,30 @@ mod test {
         assert_eq!(doc.verification_method.len(), 2);
 
         assert_eq!(doc.authentication[0], doc.verification_method[1].id);
+    }
+
+    #[test]
+    fn test_keys_invalidity() {
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let attributes = vec![DidattributeChangedFilter {
+            name: *b"xmtp/installation/hex           ",
+            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            ..base_attr_changed(identity, Some(50))
+        }];
+
+        let mut builder = EthrBuilder::default();
+        builder.public_key(&identity).unwrap();
+        builder.now(U256::from(100));
+
+        for attr in attributes {
+            builder.attribute_event(attr).unwrap()
+        }
+
+        assert_eq!(builder.xmtp_count, 1);
+
+        let doc = builder.build().unwrap();
+        println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+        assert_eq!(doc.verification_method.len(), 1);
+        assert_eq!(doc.authentication.len(), 0);
     }
 }

@@ -43,22 +43,41 @@ pub(super) enum Key {
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// DID Ethr Builder
 pub struct EthrBuilder {
+    /// Context of the DID
     pub(super) context: Vec<Url>,
+    /// The DID
     pub(super) id: DidUrl,
+    /// Aliases for the DID
     pub(super) also_known_as: Vec<DidUrl>,
+    /// Controller of the DID
     pub(super) controller: Option<DidUrl>,
+    /// Verification methods associated with the DID
     pub(super) verification_method: Vec<VerificationMethod>,
+    /// Authentication methods associated with the DID
     pub(super) authentication: Vec<DidUrl>,
+    /// Assertion methods associated with the DID
     pub(super) assertion_method: Vec<DidUrl>,
+    /// Key agreement keys associated with the DID
     pub(super) key_agreement: Vec<DidUrl>,
+    /// Invokers associated with the DID    
     pub(super) capability_invocation: Vec<DidUrl>,
+    /// Delegates associated with the DID
     pub(super) capability_delegation: Vec<DidUrl>,
+    /// External services associated with the DID
     pub(super) service: Vec<Service>,
+    /// the index a new delegate should be assigned
     pub(super) delegate_count: usize,
+    /// the index a new service should be assigned
     pub(super) service_count: usize,
+    /// the index a new xmtp key should be assigned
     pub(super) xmtp_count: usize,
+    /// whether the document has been deactivated
     pub(super) is_deactivated: bool,
+    /// Current time for the document
     pub(super) now: U256,
+    /// Map of keys to their index in the document
+    /// _*NOTE*_: this is used to ensure the order of keys is maintained, but indexes of the same
+    /// number are expected. (EX: a delegate and service both with index 0)
     pub(super) keys: HashMap<Key, usize>,
 }
 
@@ -137,7 +156,7 @@ impl EthrBuilder {
             purpose: key_purpose,
         };
 
-        if event.valid_to <= self.now {
+        if !event.is_valid(&self.now) {
             log::debug!("No Longer Valid {:?}", key);
             self.keys.remove(&key);
             return Ok(());
@@ -175,41 +194,29 @@ impl EthrBuilder {
             attribute: attribute.clone(),
         };
 
-        // invalid events still increment the counter, unless in the case of revocation
-        if event.valid_to <= self.now {
-            if self.keys.remove(&key).is_some() {
-                return Ok(());
-            }
-            match attribute {
-                Attribute::PublicKey(_) => {
-                    self.delegate_count += 1;
-                }
-                Attribute::Service(_) => {
-                    self.service_count += 1;
-                }
-                Attribute::Xmtp(_) => {
-                    self.xmtp_count += 1;
-                }
-                Attribute::Other(_) => {
-                    log::warn!(
-                        "unhandled or malformed attribute {name}:{}",
-                        event.value_string_lossy()
-                    )
-                }
-            };
+        // if the event is invalid, and the key exists, it means this attribute changed event
+        // is revoking the key
+        if !event.is_valid(&self.now) && self.keys.remove(&key).is_some() {
+            return Ok(());
         }
 
         match attribute {
             Attribute::PublicKey(_) => {
-                self.keys.insert(key, self.delegate_count);
+                if event.is_valid(&self.now) {
+                    self.keys.insert(key, self.delegate_count);
+                }
                 self.delegate_count += 1;
             }
             Attribute::Service(_) => {
-                self.keys.insert(key, self.service_count);
+                if event.is_valid(&self.now) {
+                    self.keys.insert(key, self.service_count);
+                }
                 self.service_count += 1;
             }
             Attribute::Xmtp(_) => {
-                self.keys.insert(key, self.xmtp_count);
+                if event.is_valid(&self.now) {
+                    self.keys.insert(key, self.xmtp_count);
+                }
                 self.xmtp_count += 1;
             }
             Attribute::Other(_) => {

@@ -33,6 +33,18 @@ impl DIDRegistryEvents {
             }
         }
     }
+
+    pub fn is_valid(&self, now: &U256) -> bool {
+        match self {
+            DIDRegistryEvents::DidattributeChangedFilter(attribute_changed) => {
+                attribute_changed.is_valid(now)
+            }
+            DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
+                delegate_changed.is_valid(now)
+            }
+            DIDRegistryEvents::DidownerChangedFilter(_) => true,
+        }
+    }
 }
 
 impl DidattributeChangedFilter {
@@ -42,6 +54,16 @@ impl DidattributeChangedFilter {
 
     pub fn name_string_lossy(&self) -> String {
         String::from_utf8_lossy(self.name.as_ref()).to_string()
+    }
+
+    pub fn is_valid(&self, now: &U256) -> bool {
+        self.valid_to > *now
+    }
+}
+
+impl DiddelegateChangedFilter {
+    pub fn is_valid(&self, now: &U256) -> bool {
+        self.valid_to > *now
     }
 }
 
