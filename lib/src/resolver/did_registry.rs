@@ -264,4 +264,45 @@ mod test {
         assert!(event.is_valid(&U256::from(0)));
         assert!(!event.is_valid(&U256::from(100)));
     }
+
+    #[test]
+    fn test_event_is_valid() {
+        let events = vec![
+            DIDRegistryEvents::DidattributeChangedFilter(DidattributeChangedFilter {
+                identity: Address::zero(),
+                name: [0; 32],
+                value: vec![0].into(),
+                valid_to: U256::from(100),
+                previous_change: U256::from(0),
+            }),
+            DIDRegistryEvents::DiddelegateChangedFilter(DiddelegateChangedFilter {
+                identity: Address::zero(),
+                delegate_type: [0; 32],
+                delegate: Address::zero(),
+                valid_to: U256::from(100),
+                previous_change: U256::from(0),
+            }),
+        ];
+
+        let now = U256::from(50);
+        for event in &events {
+            assert!(event.is_valid(&now));
+        }
+
+        let now = U256::from(100);
+        for event in &events {
+            assert!(!event.is_valid(&now));
+        }
+    }
+
+    #[test]
+    fn test_owner_is_valid() {
+        let event = DIDRegistryEvents::DidownerChangedFilter(DidownerChangedFilter {
+            identity: Address::zero(),
+            owner: Address::zero(),
+            previous_change: U256::from(0),
+        });
+        assert!(event.is_valid(&U256::from(0)));
+        assert!(event.is_valid(&U256::MAX));
+    }
 }
