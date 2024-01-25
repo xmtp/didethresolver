@@ -1,6 +1,6 @@
 use ethers::{
-    abi::{Address, EncodePackedError},
-    contract::{ContractError, EthError},
+    abi::EncodePackedError,
+    contract::ContractError,
     providers::{Middleware, ProviderError},
     signers::WalletError,
 };
@@ -50,8 +50,6 @@ impl<M: Middleware> From<ResolverError<M>> for ErrorObjectOwned {
 
 #[derive(Error, Debug)]
 pub enum RegistrySignerError<M: Middleware> {
-    #[error("Sign Error {0}")]
-    SignError(String),
     #[error(transparent)]
     Encode(#[from] EncodePackedError),
     #[error("{0}")]
@@ -60,10 +58,4 @@ pub enum RegistrySignerError<M: Middleware> {
     Provider(#[from] ProviderError),
     #[error(transparent)]
     Wallet(#[from] WalletError),
-}
-
-#[derive(EthError, Clone, Debug)]
-pub struct BadSignature {
-    identity: Address,
-    signer: Address,
 }
