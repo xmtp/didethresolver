@@ -295,13 +295,6 @@ impl DidUrl {
         self.path = path.to_string();
     }
 
-    /// Append a path segment to the path of this [`DidUrl`]
-    ///
-    ///
-    pub fn append_path(&mut self, path: &str) {
-        self.path = self.path.to_string() + "/" + path;
-    }
-
     pub fn set_account(&mut self, account: Account) {
         self.did.account = account;
     }
