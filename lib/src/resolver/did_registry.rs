@@ -138,7 +138,7 @@ impl RegistrySignerExt for LocalWallet {
             Token::Bytes(validity_bytes[0..32].to_vec()),
         ];
 
-        sign_data(self, registry, message).await
+        sign_typed_data(self, registry, message).await
     }
 
     async fn sign_revoke_attribute<M: Middleware>(
@@ -152,7 +152,7 @@ impl RegistrySignerExt for LocalWallet {
             Token::FixedBytes(key.to_vec()),
             Token::Bytes(value.to_vec()),
         ];
-        sign_data(self, registry, message).await
+        sign_typed_data(self, registry, message).await
     }
 
     async fn sign_delegate<M: Middleware>(
@@ -172,7 +172,7 @@ impl RegistrySignerExt for LocalWallet {
             Token::Bytes(validity_bytes[0..32].to_vec()),
         ];
 
-        sign_data(self, registry, message).await
+        sign_typed_data(self, registry, message).await
     }
 
     async fn sign_revoke_delegate<M: Middleware>(
@@ -186,7 +186,7 @@ impl RegistrySignerExt for LocalWallet {
             Token::FixedBytes(key.to_vec()),
             Token::Address(delegate),
         ];
-        sign_data(self, registry, message).await
+        sign_typed_data(self, registry, message).await
     }
 
     async fn sign_owner<M: Middleware>(
@@ -198,11 +198,12 @@ impl RegistrySignerExt for LocalWallet {
             Token::Bytes(b"changeOwner".to_vec()),
             Token::Address(new_owner),
         ];
-        sign_data(self, registry, message).await
+        sign_typed_data(self, registry, message).await
     }
 }
 
-async fn sign_data<M: Middleware>(
+/// Sign data in an [EIP-712](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md) compliant format
+async fn sign_typed_data<M: Middleware>(
     wallet: &LocalWallet,
     registry: &DIDRegistry<M>,
     tokens: Vec<Token>,
