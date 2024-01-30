@@ -8,17 +8,21 @@ use ethers::{
     types::{Address, U256},
 };
 use integration_util::{validate_document, with_client};
-use lib_didethresolver::{
-    did_registry::RegistrySignerExt,
-    rpc::DidRegistryClient,
-    types::{DidUrl, KeyType, VerificationMethodProperties, NULL_ADDRESS},
-};
 
-//TODO: Add tests for: Errors, formats, entire document asserts
+#[cfg(test)]
+mod it {
 
-#[tokio::test]
-pub async fn test_attributes() -> Result<()> {
-    with_client(None, |client, registry, signer, _| async move {
+    use lib_didethresolver::{
+        did_registry::RegistrySignerExt,
+        rpc::DidRegistryClient,
+        types::{DidUrl, KeyType, VerificationMethodProperties, NULL_ADDRESS},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    pub async fn test_attributes() -> Result<()> {
+        with_client(None, |client, registry, signer, _| async move {
         let me = signer.address();
         let did = registry.set_attribute(
             me,
@@ -93,11 +97,11 @@ pub async fn test_attributes() -> Result<()> {
         Ok(())
     })
     .await
-}
+    }
 
-#[tokio::test]
-pub async fn test_attributes_versions() -> Result<()> {
-    with_client(None, |client, registry, signer, _| async move {
+    #[tokio::test]
+    pub async fn test_attributes_versions() -> Result<()> {
+        with_client(None, |client, registry, signer, _| async move {
         let me = signer.address();
         let did = registry.set_attribute(
             me,
@@ -134,315 +138,320 @@ pub async fn test_attributes_versions() -> Result<()> {
         Ok(())
     })
     .await
-}
+    }
 
-#[tokio::test]
-pub async fn test_delegate() -> Result<()> {
-    with_client(None, |client, registry, signer, anvil| async move {
-        let me = signer.address();
-        let delegate: LocalWallet = anvil.keys()[4].clone().into();
-        let did = registry.add_delegate(
-            me,
-            *b"sigAuth                         ",
-            delegate.address(),
-            U256::from(604_800),
-        );
-        did.send().await?.await?;
+    #[tokio::test]
+    pub async fn test_delegate() -> Result<()> {
+        with_client(None, |client, registry, signer, anvil| async move {
+            let me = signer.address();
+            let delegate: LocalWallet = anvil.keys()[4].clone().into();
+            let did = registry.add_delegate(
+                me,
+                *b"sigAuth                         ",
+                delegate.address(),
+                U256::from(604_800),
+            );
+            did.send().await?.await?;
 
-        let did = registry.add_delegate(
-            me,
-            *b"veriKey                         ",
-            delegate.address(),
-            U256::from(604_800),
-        );
-        did.send().await?.await?;
+            let did = registry.add_delegate(
+                me,
+                *b"veriKey                         ",
+                delegate.address(),
+                U256::from(604_800),
+            );
+            did.send().await?.await?;
 
-        let resolution_response = client.resolve_did(hex::encode(me), None).await?;
-        validate_document(&resolution_response.document).await;
+            let resolution_response = client.resolve_did(hex::encode(me), None).await?;
+            validate_document(&resolution_response.document).await;
 
-        assert_eq!(
-            resolution_response.document.verification_method[1].id,
-            DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
-        );
-        assert_eq!(
-            resolution_response.document.verification_method[1].controller,
-            DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
-        );
-        assert_eq!(
-            resolution_response.document.verification_method[1].verification_properties,
-            Some(VerificationMethodProperties::BlockchainAccountId {
-                blockchain_account_id: format!("0x{}", hex::encode(delegate.address()))
-            })
-        );
+            assert_eq!(
+                resolution_response.document.verification_method[1].id,
+                DidUrl::parse(format!("did:ethr:0x{}#delegate-0", hex::encode(me))).unwrap()
+            );
+            assert_eq!(
+                resolution_response.document.verification_method[1].controller,
+                DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
+            );
+            assert_eq!(
+                resolution_response.document.verification_method[1].verification_properties,
+                Some(VerificationMethodProperties::BlockchainAccountId {
+                    blockchain_account_id: format!("0x{}", hex::encode(delegate.address()))
+                })
+            );
 
-        assert_eq!(
-            resolution_response.document.verification_method[2].id,
-            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
-        );
-        assert_eq!(
-            resolution_response.document.verification_method[2].controller,
-            DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
-        );
-        assert_eq!(
-            resolution_response.document.verification_method[2].verification_properties,
-            Some(VerificationMethodProperties::BlockchainAccountId {
-                blockchain_account_id: format!("0x{}", hex::encode(delegate.address()))
-            })
-        );
+            assert_eq!(
+                resolution_response.document.verification_method[2].id,
+                DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+            );
+            assert_eq!(
+                resolution_response.document.verification_method[2].controller,
+                DidUrl::parse(format!("did:ethr:0x{}", hex::encode(me))).unwrap()
+            );
+            assert_eq!(
+                resolution_response.document.verification_method[2].verification_properties,
+                Some(VerificationMethodProperties::BlockchainAccountId {
+                    blockchain_account_id: format!("0x{}", hex::encode(delegate.address()))
+                })
+            );
 
-        Ok(())
-    })
-    .await
-}
+            Ok(())
+        })
+        .await
+    }
 
-#[tokio::test]
-pub async fn test_owner_changed() -> Result<()> {
-    with_client(None, |client, registry, signer, anvil| async move {
-        let me = signer.address();
-        let new_owner: LocalWallet = anvil.keys()[4].clone().into();
-        let did = registry.change_owner(me, new_owner.address());
-        did.send().await?.await?;
+    #[tokio::test]
+    pub async fn test_owner_changed() -> Result<()> {
+        with_client(None, |client, registry, signer, anvil| async move {
+            let me = signer.address();
+            let new_owner: LocalWallet = anvil.keys()[4].clone().into();
+            let did = registry.change_owner(me, new_owner.address());
+            did.send().await?.await?;
 
-        let resolution_response = client.resolve_did(hex::encode(me), None).await?;
-        validate_document(&resolution_response.document).await;
+            let resolution_response = client.resolve_did(hex::encode(me), None).await?;
+            validate_document(&resolution_response.document).await;
 
-        assert_eq!(
-            resolution_response.document.controller,
-            Some(
-                DidUrl::parse(format!("did:ethr:0x{}", hex::encode(new_owner.address()))).unwrap()
-            )
-        );
-        Ok(())
-    })
-    .await
-}
+            assert_eq!(
+                resolution_response.document.controller,
+                Some(
+                    DidUrl::parse(format!("did:ethr:0x{}", hex::encode(new_owner.address())))
+                        .unwrap()
+                )
+            );
+            Ok(())
+        })
+        .await
+    }
 
-#[tokio::test]
-pub async fn test_attribute_revocation() -> Result<()> {
-    with_client(None, |client, registry, signer, _| async move {
-        let me = signer.address();
-        let did = registry.set_attribute(
-            me,
-            *b"did/pub/Secp256k1/veriKey/hex   ",
-            b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
-            U256::from(604_800),
-        );
-        did.send().await?.await?;
+    #[tokio::test]
+    pub async fn test_attribute_revocation() -> Result<()> {
+        with_client(None, |client, registry, signer, _| async move {
+            let me = signer.address();
+            let did = registry.set_attribute(
+                me,
+                *b"did/pub/Secp256k1/veriKey/hex   ",
+                b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                U256::from(604_800),
+            );
+            did.send().await?.await?;
 
-        let did = registry.revoke_attribute(
-            me,
-            *b"did/pub/Secp256k1/veriKey/hex   ",
-            b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
-        );
-        did.send().await?.await?;
+            let did = registry.revoke_attribute(
+                me,
+                *b"did/pub/Secp256k1/veriKey/hex   ",
+                b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            );
+            did.send().await?.await?;
 
-        let document = client.resolve_did(hex::encode(me), None).await?.document;
-        validate_document(&document).await;
+            let document = client.resolve_did(hex::encode(me), None).await?.document;
+            validate_document(&document).await;
 
-        assert_eq!(
-            document.verification_method[0].id,
-            DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
-        );
-        assert_eq!(document.verification_method.len(), 1);
+            assert_eq!(
+                document.verification_method[0].id,
+                DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
+            );
+            assert_eq!(document.verification_method.len(), 1);
 
-        Ok(())
-    })
-    .await
-}
+            Ok(())
+        })
+        .await
+    }
 
-#[tokio::test]
-pub async fn test_delegate_revocation() -> Result<()> {
-    with_client(None, |client, registry, signer, anvil| async move {
-        let me = signer.address();
-        let delegate: LocalWallet = anvil.keys()[4].clone().into();
-        let did = registry.add_delegate(
-            me,
-            *b"sigAuth                         ",
-            delegate.address(),
-            U256::from(604_800),
-        );
-        did.send().await?.await?;
-        let did = registry.add_delegate(
-            me,
-            *b"veriKey                         ",
-            delegate.address(),
-            U256::from(604_800),
-        );
-        did.send().await?.await?;
+    #[tokio::test]
+    pub async fn test_delegate_revocation() -> Result<()> {
+        with_client(None, |client, registry, signer, anvil| async move {
+            let me = signer.address();
+            let delegate: LocalWallet = anvil.keys()[4].clone().into();
+            let did = registry.add_delegate(
+                me,
+                *b"sigAuth                         ",
+                delegate.address(),
+                U256::from(604_800),
+            );
+            did.send().await?.await?;
+            let did = registry.add_delegate(
+                me,
+                *b"veriKey                         ",
+                delegate.address(),
+                U256::from(604_800),
+            );
+            did.send().await?.await?;
 
-        let did =
-            registry.revoke_delegate(me, *b"sigAuth0000000000000000000000000", delegate.address());
-        did.send().await?.await?;
+            let did = registry.revoke_delegate(
+                me,
+                *b"sigAuth0000000000000000000000000",
+                delegate.address(),
+            );
+            did.send().await?.await?;
 
-        let document = client.resolve_did(hex::encode(me), None).await?.document;
-        validate_document(&document).await;
+            let document = client.resolve_did(hex::encode(me), None).await?.document;
+            validate_document(&document).await;
 
-        assert_eq!(
-            document.verification_method[0].id,
-            DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
-        );
-        // delegate 1, veriKey should still be valid after revoking delegate 0
-        assert_eq!(
-            document.verification_method[1].id,
-            DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
-        );
-        assert_eq!(document.verification_method.len(), 2);
+            assert_eq!(
+                document.verification_method[0].id,
+                DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
+            );
+            // delegate 1, veriKey should still be valid after revoking delegate 0
+            assert_eq!(
+                document.verification_method[1].id,
+                DidUrl::parse(format!("did:ethr:0x{}#delegate-1", hex::encode(me))).unwrap()
+            );
+            assert_eq!(document.verification_method.len(), 2);
 
-        Ok(())
-    })
-    .await
-}
+            Ok(())
+        })
+        .await
+    }
 
-#[tokio::test]
-pub async fn test_owner_revocation() -> Result<()> {
-    with_client(None, |client, registry, signer, _| async move {
-        let me = signer.address();
-        let null = Address::from_str(NULL_ADDRESS.strip_prefix("0x").unwrap()).unwrap();
-        let did = registry.change_owner(me, null);
-        did.send().await?.await?;
+    #[tokio::test]
+    pub async fn test_owner_revocation() -> Result<()> {
+        with_client(None, |client, registry, signer, _| async move {
+            let me = signer.address();
+            let null = Address::from_str(NULL_ADDRESS.strip_prefix("0x").unwrap()).unwrap();
+            let did = registry.change_owner(me, null);
+            did.send().await?.await?;
 
-        let resolved = client.resolve_did(hex::encode(me), None).await?;
-        validate_document(&resolved.document).await;
+            let resolved = client.resolve_did(hex::encode(me), None).await?;
+            validate_document(&resolved.document).await;
 
-        assert!(resolved.metadata.deactivated);
+            assert!(resolved.metadata.deactivated);
 
-        Ok(())
-    })
-    .await
-}
+            Ok(())
+        })
+        .await
+    }
 
-#[tokio::test]
-pub async fn test_xmtp_revocation() -> Result<()> {
-    with_client(None, |client, registry, signer, _| async move {
-        let me = signer.address();
-        let attribute_name = *b"xmtp/installation/hex           ";
-        let did = registry.set_attribute(
-            me,
-            attribute_name,
-            b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
-            U256::from(604_800),
-        );
-        did.send().await?.await?;
+    #[tokio::test]
+    pub async fn test_xmtp_revocation() -> Result<()> {
+        with_client(None, |client, registry, signer, _| async move {
+            let me = signer.address();
+            let attribute_name = *b"xmtp/installation/hex           ";
+            let did = registry.set_attribute(
+                me,
+                attribute_name,
+                b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                U256::from(604_800),
+            );
+            did.send().await?.await?;
 
-        let document = client.resolve_did(hex::encode(me), None).await?.document;
-        assert_eq!(
-            document.verification_method[1].id,
-            DidUrl::parse(format!(
-                "did:ethr:0x{}?meta=installation#xmtp-0",
-                hex::encode(me)
-            ))
-            .unwrap()
-        );
+            let document = client.resolve_did(hex::encode(me), None).await?.document;
+            assert_eq!(
+                document.verification_method[1].id,
+                DidUrl::parse(format!(
+                    "did:ethr:0x{}?meta=installation#xmtp-0",
+                    hex::encode(me)
+                ))
+                .unwrap()
+            );
 
-        let did = registry.revoke_attribute(
-            me,
-            attribute_name,
-            b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
-        );
-        did.send().await?.await?;
+            let did = registry.revoke_attribute(
+                me,
+                attribute_name,
+                b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            );
+            did.send().await?.await?;
 
-        let document = client.resolve_did(hex::encode(me), None).await?.document;
-        validate_document(&document).await;
-        assert_eq!(
-            document.verification_method[0].id,
-            DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
-        );
-        assert_eq!(document.verification_method.len(), 1);
+            let document = client.resolve_did(hex::encode(me), None).await?.document;
+            validate_document(&document).await;
+            assert_eq!(
+                document.verification_method[0].id,
+                DidUrl::parse(format!("did:ethr:0x{}#controller", hex::encode(me))).unwrap()
+            );
+            assert_eq!(document.verification_method.len(), 1);
 
-        Ok(())
-    })
-    .await
-}
+            Ok(())
+        })
+        .await
+    }
 
-#[tokio::test]
-pub async fn test_signed_fns() -> Result<()> {
-    with_client(None, |_, registry, _, anvil| async move {
-        let me: LocalWallet = anvil.keys()[3].clone().into();
-        let name = *b"xmtp/installation/hex           ";
-        let value = b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71";
-        let validity = U256::from(604_800);
-        let signature = me
-            .sign_attribute(&registry, name, value.to_vec(), validity)
-            .await?;
+    #[tokio::test]
+    pub async fn test_signed_fns() -> Result<()> {
+        with_client(None, |_, registry, _, anvil| async move {
+            let me: LocalWallet = anvil.keys()[3].clone().into();
+            let name = *b"xmtp/installation/hex           ";
+            let value = b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71";
+            let validity = U256::from(604_800);
+            let signature = me
+                .sign_attribute(&registry, name, value.to_vec(), validity)
+                .await?;
 
-        let attr = registry.set_attribute_signed(
-            me.address(),
-            signature.v.try_into().unwrap(),
-            signature.r.into(),
-            signature.s.into(),
-            name,
-            value.into(),
-            validity,
-        );
-        attr.send().await?.await?;
-
-        let signature = me
-            .sign_revoke_attribute(&registry, name, value.to_vec())
-            .await?;
-        registry
-            .revoke_attribute_signed(
+            let attr = registry.set_attribute_signed(
                 me.address(),
                 signature.v.try_into().unwrap(),
                 signature.r.into(),
                 signature.s.into(),
                 name,
                 value.into(),
-            )
-            .send()
-            .await?
-            .await?;
-
-        let delegate_type = *b"sigAuth                         ";
-
-        let signature = me
-            .sign_delegate(&registry, delegate_type, me.address(), validity)
-            .await?;
-        registry
-            .add_delegate_signed(
-                me.address(),
-                signature.v.try_into().unwrap(),
-                signature.r.into(),
-                signature.s.into(),
-                delegate_type,
-                me.address(),
                 validity,
-            )
-            .send()
-            .await?
-            .await?;
+            );
+            attr.send().await?.await?;
 
-        let signature = me
-            .sign_revoke_delegate(&registry, delegate_type, me.address())
-            .await?;
+            let signature = me
+                .sign_revoke_attribute(&registry, name, value.to_vec())
+                .await?;
+            registry
+                .revoke_attribute_signed(
+                    me.address(),
+                    signature.v.try_into().unwrap(),
+                    signature.r.into(),
+                    signature.s.into(),
+                    name,
+                    value.into(),
+                )
+                .send()
+                .await?
+                .await?;
 
-        registry
-            .revoke_delegate_signed(
-                me.address(),
-                signature.v.try_into().unwrap(),
-                signature.r.into(),
-                signature.s.into(),
-                delegate_type,
-                me.address(),
-            )
-            .send()
-            .await?
-            .await?;
+            let delegate_type = *b"sigAuth                         ";
 
-        let new_owner = Address::from_str(NULL_ADDRESS.strip_prefix("0x").unwrap()).unwrap();
-        let signature = me.sign_owner(&registry, new_owner).await?;
-        registry
-            .change_owner_signed(
-                me.address(),
-                signature.v.try_into().unwrap(),
-                signature.r.into(),
-                signature.s.into(),
-                new_owner,
-            )
-            .send()
-            .await?
-            .await?;
+            let signature = me
+                .sign_delegate(&registry, delegate_type, me.address(), validity)
+                .await?;
+            registry
+                .add_delegate_signed(
+                    me.address(),
+                    signature.v.try_into().unwrap(),
+                    signature.r.into(),
+                    signature.s.into(),
+                    delegate_type,
+                    me.address(),
+                    validity,
+                )
+                .send()
+                .await?
+                .await?;
 
-        Ok(())
-    })
-    .await
+            let signature = me
+                .sign_revoke_delegate(&registry, delegate_type, me.address())
+                .await?;
+
+            registry
+                .revoke_delegate_signed(
+                    me.address(),
+                    signature.v.try_into().unwrap(),
+                    signature.r.into(),
+                    signature.s.into(),
+                    delegate_type,
+                    me.address(),
+                )
+                .send()
+                .await?
+                .await?;
+
+            let new_owner = Address::from_str(NULL_ADDRESS.strip_prefix("0x").unwrap()).unwrap();
+            let signature = me.sign_owner(&registry, new_owner).await?;
+            registry
+                .change_owner_signed(
+                    me.address(),
+                    signature.v.try_into().unwrap(),
+                    signature.r.into(),
+                    signature.s.into(),
+                    new_owner,
+                )
+                .send()
+                .await?
+                .await?;
+
+            Ok(())
+        })
+        .await
+    }
 }

@@ -100,10 +100,16 @@ mod tests {
         assert_eq!(args.port, DEFAULT_PORT);
         assert_eq!(args.rpc_url, DEFAULT_RPC_URL);
         assert_eq!(args.did_registry, "0x1234567890");
-        let args2 = Args::parse_from(&["didethresolver", "--did-registry", "0x0987654321"]);
+        let args2 = Args::parse_from(&[
+            "didethresolver",
+            "--did-registry",
+            "0x0987654321",
+            "--rpc-url",
+            "http://rpc2.xyz",
+        ]);
         assert_eq!(args2.host, DEFAULT_HOST);
         assert_eq!(args2.port, DEFAULT_PORT);
-        assert_eq!(args2.rpc_url, DEFAULT_RPC_URL);
+        assert_eq!(args2.rpc_url, "http://rpc2.xyz");
         assert_eq!(args2.did_registry, "0x0987654321");
         putback(env)
     }

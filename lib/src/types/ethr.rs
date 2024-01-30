@@ -117,7 +117,7 @@ impl EthrBuilder {
 
     /// set the identity of the document
     pub fn public_key(&mut self, key: &Address) -> Result<(), EthrBuilderError> {
-        self.id.set_account(types::Account::Address(*key));
+        self.id = self.id.with_account(types::Account::Address(*key));
         Ok(())
     }
 
@@ -128,8 +128,7 @@ impl EthrBuilder {
 
     /// Set the controller of the document
     pub fn controller(&mut self, controller: &Address) -> Result<(), EthrBuilderError> {
-        let mut did = self.id.clone();
-        did.set_account(types::Account::Address(*controller));
+        let did = self.id.with_account(types::Account::Address(*controller));
         self.controller = Some(did);
         Ok(())
     }
@@ -254,8 +253,7 @@ impl EthrBuilder {
         value: V,
         service: ServiceType,
     ) -> Result<(), EthrBuilderError> {
-        let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("service-{}", index)));
+        let did = self.id.with_fragment(Some(&format!("service-{}", index)));
         let endpoint = Url::parse(&String::from_utf8_lossy(value.as_ref()))?;
         self.service.push(Service {
             id: did,
@@ -280,9 +278,7 @@ impl EthrBuilder {
         value: V,
         key: PublicKey,
     ) -> Result<(), EthrBuilderError> {
-        let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("delegate-{}", index)));
-
+        let did = self.id.with_fragment(Some(&format!("delegate-{}", index)));
         let method = VerificationMethod {
             id: did,
             controller: self.id.clone(),
@@ -332,8 +328,7 @@ impl EthrBuilder {
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
     pub fn delegate(&mut self, index: usize, delegate: &Address, purpose: KeyPurpose) {
-        let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("delegate-{}", index)));
+        let did = self.id.with_fragment(Some(&format!("delegate-{}", index)));
 
         // TODO: Handle ChainID
         let method = VerificationMethod {
@@ -360,7 +355,7 @@ impl EthrBuilder {
     /// Handle controller changes according to [owner changed](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#controller-changes-didownerchanged) and [registration](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#create-register)
     fn build_controller(&mut self) {
         let mut controller = self.controller.clone().unwrap_or(self.id.clone());
-        controller.set_fragment(Some("controller"));
+        controller = controller.with_fragment(Some("controller"));
 
         self.verification_method.push(VerificationMethod {
             id: controller.clone(),
@@ -374,8 +369,7 @@ impl EthrBuilder {
         // if we are resolving for a key that is a public key which matches the id, we need to add
         // another `controllerKey` verification method
         if let Account::HexKey(_) = self.id.account() {
-            let mut controller_key = self.id.clone();
-            controller_key.set_fragment(Some("controllerKey"));
+            let controller_key = self.id.with_fragment(Some("controllerKey"));
             self.verification_method.push(VerificationMethod {
                 id: controller_key.clone(),
                 controller: self.id.clone(),
