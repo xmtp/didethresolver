@@ -19,17 +19,21 @@ use crate::{
 
 /// A resolver for did:ethr that follows the steps outlined in the [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#read-resolve) in order to resolve a did:ethr identifier.
 pub struct Resolver<M> {
-    signer: Arc<M>,
     registry: DIDRegistry<M>,
+}
+
+impl<M> From<DIDRegistry<M>> for Resolver<M> {
+    fn from(registry: DIDRegistry<M>) -> Self {
+        Self { registry }
+    }
 }
 
 impl<M: Middleware + 'static> Resolver<M> {
     /// Instantiate a new did:ethr resolver
     pub async fn new(middleware: M, registry: Address) -> Result<Self, ResolverError<M>> {
-        let signer = Arc::new(middleware);
-        let registry = DIDRegistry::new(registry, signer.clone());
+        let registry = DIDRegistry::new(registry, middleware.into());
         log::debug!("Using deployed registry at {}", registry.address());
-        Ok(Self { signer, registry })
+        Ok(Self { registry })
     }
 
     /// Resolve a did:ethr identifier
@@ -131,12 +135,12 @@ impl<M: Middleware + 'static> Resolver<M> {
         base_document.public_key(&public_key)?;
 
         let current_block = self
-            .signer
+            .signer()
             .get_block_number()
             .await
             .map_err(|e| ResolverError::Middleware(e.to_string()))?;
         let current_block = self
-            .signer
+            .signer()
             .get_block(current_block)
             .await
             .map_err(|e| ResolverError::Middleware(e.to_string()))?;
@@ -182,7 +186,7 @@ impl<M: Middleware + 'static> Resolver<M> {
 
         // get the timestamp for the current_verison_id
         let current_version_timestamp = self
-            .signer
+            .signer()
             .get_block(current_version_id)
             .await
             .map_err(|e| ResolverError::Middleware(e.to_string()))?
@@ -196,7 +200,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                 next_version_id: last_updated_did_version_id.map(|ver| ver.as_u64()),
                 next_update: match last_updated_did_version_id {
                     Some(ver) => self
-                        .signer
+                        .signer()
                         .get_block(ver)
                         .await
                         .map_err(|e| ResolverError::Middleware(e.to_string()))?
@@ -210,5 +214,9 @@ impl<M: Middleware + 'static> Resolver<M> {
             },
         };
         Ok(resolution_result)
+    }
+
+    fn signer(&self) -> Arc<M> {
+        self.registry.client()
     }
 }

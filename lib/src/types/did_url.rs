@@ -14,7 +14,7 @@ use crate::error::DidError;
 pub struct DidUrl {
     pub did: Did,
     pub path: String,
-    pub query: Option<String>,
+    pub query: Vec<(String, String)>,
     pub fragment: Option<String>,
 }
 
@@ -161,7 +161,11 @@ impl DidUrl {
             acc
         });
 
-        let query = url.query().map(|query| query.to_owned());
+        let query = url
+            .query_pairs()
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect();
+
         let fragment = url.fragment().map(|fragment| fragment.to_owned());
 
         Ok(Self {
@@ -232,13 +236,18 @@ impl DidUrl {
         &self.path
     }
 
-    pub fn query(&self) -> Option<&str> {
-        self.query.as_deref()
+    pub fn query(&self) -> Option<String> {
+        let q = self.format_query();
+        Some(q).filter(|q| !q.is_empty())
     }
 
-    pub fn set_query(&mut self, key: &str, value: Option<&str>) {
-        let query = format!("{}={}", key, value.unwrap_or(""));
-        self.query = Some(query);
+    pub fn query_pairs(&self) -> impl Iterator<Item = &(String, String)> {
+        self.query.iter()
+    }
+
+    pub fn add_query(&mut self, key: &str, value: Option<&str>) {
+        self.query
+            .push((key.to_string(), value.unwrap_or("").to_string()));
     }
 
     /// Returns this DID's fragment identifier, if any.
@@ -298,14 +307,31 @@ impl DidUrl {
     pub fn set_account(&mut self, account: Account) {
         self.did.account = account;
     }
+
+    fn format_query(&self) -> String {
+        let mut full_query = String::new();
+        let mut pairs = self.query_pairs();
+
+        if let Some((key, value)) = pairs.next() {
+            full_query.push_str(&format!("?{}={}", key, value));
+        }
+        for (key, value) in pairs {
+            let query = format!("&{}={}", key, value);
+            full_query.push_str(&query);
+        }
+        full_query
+    }
 }
 
 impl ToString for DidUrl {
     fn to_string(&self) -> String {
-        let mut string = format!("{}{}", self.did.to_string(), self.path());
-        if let Some(query) = self.query() {
-            string = format!("{}?{}", string, query);
-        }
+        let mut string = format!(
+            "{}{}{}",
+            self.did.to_string(),
+            self.path(),
+            self.format_query()
+        );
+
         if let Some(fragment) = self.fragment() {
             string = format!("{}#{}", string, fragment);
         }
@@ -456,5 +482,54 @@ mod tests {
 
         did_url.set_path("path-2");
         assert_eq!(did_url.path(), "path-2");
+    }
+
+    #[test]
+    fn test_add_query() {
+        let mut did_url =
+            DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
+        did_url.add_query("meta", Some("test"));
+        assert_eq!(
+            did_url.to_string(),
+            "did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=test"
+        );
+    }
+
+    #[test]
+    fn test_multiple_queries() {
+        let mut did_url =
+            DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
+        did_url.add_query("meta", Some("hi"));
+        did_url.add_query("username", None);
+        did_url.add_query("password", Some("hunter2"));
+
+        assert_eq!(
+            did_url.to_string(),
+            "did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=hi&username=&password=hunter2"
+        )
+    }
+
+    #[test]
+    fn test_add_empty_query() {
+        let mut did_url =
+            DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
+        did_url.add_query("meta", None);
+        assert_eq!(
+            did_url.to_string(),
+            "did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta="
+        );
+    }
+
+    #[test]
+    fn test_query_parses() {
+        let did_url = DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=hi&username=&password=hunter2").unwrap();
+
+        let mut pairs = did_url.query_pairs();
+        assert_eq!(pairs.next(), Some(("meta".into(), "hi".into())).as_ref());
+        assert_eq!(pairs.next(), Some(("username".into(), "".into())).as_ref());
+        assert_eq!(
+            pairs.next(),
+            Some(("password".into(), "hunter2".into())).as_ref()
+        );
     }
 }

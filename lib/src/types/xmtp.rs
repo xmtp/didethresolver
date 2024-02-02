@@ -89,7 +89,7 @@ impl EthrBuilder {
             verification_properties: Self::encode_attribute_value(value, key.encoding)?,
         };
 
-        method.id.set_query("meta", Some(&key.purpose.to_string()));
+        method.id.add_query("meta", Some(&key.purpose.to_string()));
 
         match key.purpose {
             XmtpKeyPurpose::Installation => {
