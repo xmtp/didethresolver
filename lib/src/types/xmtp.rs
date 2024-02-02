@@ -134,7 +134,7 @@ mod test {
         assert_eq!(doc.verification_method[1].id.fragment().unwrap(), "xmtp-0");
         assert_eq!(
             doc.verification_method[1].id.query().unwrap(),
-            "meta=installation"
+            "?meta=installation"
         );
         assert_eq!(doc.verification_method.len(), 2);
 

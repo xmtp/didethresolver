@@ -1,6 +1,7 @@
 //! Convenience Wrapper around [`Url`] for DID URIs according to the [DID Spec](https://www.w3.org/TR/did-core/#did-syntax)
 
 use ethers::types::Address;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize, Serializer};
 use smart_default::SmartDefault;
 use url::Url;
@@ -14,7 +15,7 @@ use crate::error::DidError;
 pub struct DidUrl {
     pub did: Did,
     pub path: String,
-    pub query: Vec<(String, String)>,
+    pub query: IndexMap<String, String>,
     pub fragment: Option<String>,
 }
 
@@ -241,13 +242,17 @@ impl DidUrl {
         Some(q).filter(|q| !q.is_empty())
     }
 
-    pub fn query_pairs(&self) -> impl Iterator<Item = &(String, String)> {
+    pub fn query_pairs(&self) -> impl Iterator<Item = (&String, &String)> {
         self.query.iter()
     }
 
     pub fn add_query(&mut self, key: &str, value: Option<&str>) {
         self.query
-            .push((key.to_string(), value.unwrap_or("").to_string()));
+            .insert(key.to_string(), value.unwrap_or("").to_string());
+    }
+
+    pub fn contains_query(&self, key: &str) -> bool {
+        self.query.contains_key(key)
     }
 
     /// Returns this DID's fragment identifier, if any.
@@ -525,11 +530,8 @@ mod tests {
         let did_url = DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=hi&username=&password=hunter2").unwrap();
 
         let mut pairs = did_url.query_pairs();
-        assert_eq!(pairs.next(), Some(("meta".into(), "hi".into())).as_ref());
-        assert_eq!(pairs.next(), Some(("username".into(), "".into())).as_ref());
-        assert_eq!(
-            pairs.next(),
-            Some(("password".into(), "hunter2".into())).as_ref()
-        );
+        assert_eq!(pairs.next(), Some((&"meta".into(), &"hi".into())));
+        assert_eq!(pairs.next(), Some((&"username".into(), &"".into())));
+        assert_eq!(pairs.next(), Some((&"password".into(), &"hunter2".into())));
     }
 }
