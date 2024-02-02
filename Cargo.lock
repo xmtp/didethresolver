@@ -2575,7 +2575,6 @@ dependencies = [
  "ethers",
  "futures",
  "hex",
- "indexmap",
  "jsonrpsee",
  "log",
  "peg",
