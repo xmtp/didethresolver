@@ -59,3 +59,14 @@ pub enum RegistrySignerError<M: Middleware> {
     #[error(transparent)]
     Wallet(#[from] WalletError),
 }
+
+/// General type error
+#[derive(Error, Debug)]
+pub enum TypeError {
+    #[error(transparent)]
+    HexConversion(#[from] hex::FromHexError),
+    #[error(transparent)]
+    Base58Conversion(#[from] bs58::decode::Error),
+    #[error(transparent)]
+    Base64Conversion(#[from] base64::DecodeError),
+}

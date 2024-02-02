@@ -14,7 +14,7 @@
 //! *_NOTE:_* This format may be updated and changed according to the needs of the XMTP protocol. (currently
 //! in development)
 
-use super::{Attribute, EthrBuilder, KeyEncoding, KeyType, VerificationMethod};
+use super::{string_to_bytes32, Attribute, EthrBuilder, KeyEncoding, KeyType, VerificationMethod};
 use crate::error::EthrBuilderError;
 
 use std::fmt;
@@ -28,6 +28,12 @@ pub struct XmtpAttribute {
     pub purpose: XmtpKeyPurpose,
     /// the encoding of the key, e.g hex or base64
     pub encoding: KeyEncoding,
+}
+
+impl From<XmtpAttribute> for [u8; 32] {
+    fn from(attr: XmtpAttribute) -> Self {
+        string_to_bytes32(attr.to_string())
+    }
 }
 
 impl fmt::Display for XmtpAttribute {
