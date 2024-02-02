@@ -120,7 +120,7 @@ mod test {
         }];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
 
         for attr in attributes {
@@ -149,7 +149,7 @@ mod test {
         }];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::from(100));
 
         for attr in attributes {

@@ -1,11 +1,22 @@
 //! Convenience Wrapper around [`Url`] for DID URIs according to the [DID Spec](https://www.w3.org/TR/did-core/#did-syntax)
 
-use ethers::types::Address;
 use serde::{Deserialize, Serialize, Serializer};
 use smart_default::SmartDefault;
 
+use ethers::{types::Address, utils::keccak256};
+
 use super::parse_ethr_did_url;
 use crate::error::DidError;
+
+/**
+ * Converts a public key to an ethereum address.  The last 20 bytes
+ * of the keccak256 hash of the public key is returned
+ */
+fn public_key_to_address(key: &[u8]) -> String {
+    let keydigest = keccak256(key);
+    let address = &keydigest[12..];
+    format!("0x{}", hex::encode(address)).to_string()
+}
 
 /// A DID URL, based on the did specification, [DID URL Syntax](https://www.w3.org/TR/did-core/#did-url-syntax)
 /// Currently only supports did:ethr: [did-ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
@@ -53,7 +64,37 @@ impl ToString for Account {
     fn to_string(&self) -> String {
         match self {
             Account::Address(addr) => format!("0x{}", hex::encode(addr.as_bytes())),
-            Account::HexKey(key) => format!("0x{}", hex::encode(key)),
+            Account::HexKey(key) => hex::encode(key).to_string(),
+        }
+    }
+}
+
+impl Account {
+    pub fn from_hex_key(key: Vec<u8>) -> Self {
+        Account::HexKey(key)
+    }
+
+    pub fn from_address(addr: Address) -> Self {
+        Account::Address(addr)
+    }
+
+    pub fn from_string(s: &str) -> Self {
+        if s.starts_with("0x") {
+            let hexes = s.strip_prefix("0x").unwrap();
+            Account::Address(Address::from_slice(&hex::decode(hexes).unwrap()))
+        } else {
+            Account::HexKey(hex::decode(s).unwrap())
+        }
+    }
+
+    pub fn to_address(&self) -> Option<Address> {
+        match self {
+            Account::Address(addr) => Some(*addr),
+            Account::HexKey(key) => {
+                let addr = public_key_to_address(key);
+                let hexes = addr.strip_prefix("0x").unwrap();
+                Some(Address::from_slice(&hex::decode(hexes).unwrap()))
+            }
         }
     }
 }
@@ -465,10 +506,10 @@ mod tests {
         let did_url =
             DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#key-1").unwrap();
         assert_eq!(did_url.fragment(), Some("key-1"));
-
+        let last = did_url.clone();
         let did_url = did_url.with_fragment(Some("key-2"));
         assert_eq!(did_url.fragment(), Some("key-2"));
-
+        assert_eq!(last.fragment(), Some("key-1"));
         let did_url = did_url.with_fragment(None);
         assert_eq!(did_url.fragment(), None);
         assert_eq!(did_url.method(), &Method::Ethr,);
@@ -491,13 +532,32 @@ mod tests {
             did_url.account(),
             &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
         );
+        let did_url = did_url.with_path(None);
+        assert_eq!(did_url.path(), None);
+    }
+
+    #[test]
+    fn test_without_query() {
+        let did_url =
+            DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a?versionId=1")
+                .unwrap()
+                .without_query();
+        assert_eq!(did_url.query(), None);
+        assert_eq!(did_url.method(), &Method::Ethr,);
+        assert_eq!(did_url.network(), &Network::Mainnet,);
+        assert_eq!(
+            did_url.account(),
+            &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
     }
 
     #[test]
     fn test_with_query() {
         let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
         assert_eq!(did_url.query(), None);
+        let last = did_url.clone();
         let did_url = did_url.with_query("key-1", Some("value-1"));
+        assert_eq!(last.query(), None);
         assert_eq!(
             did_url.query(),
             Some(&[("key-1".to_string(), "value-1".to_string())][..])
@@ -527,10 +587,78 @@ mod tests {
             did_url.account(),
             &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
         );
+        let last = did_url.clone();
         let did_url = did_url.with_account(Account::HexKey(vec![0x01, 0x02, 0x03]));
+        assert_eq!(
+            last.account(),
+            &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
         assert_eq!(did_url.account(), &Account::HexKey(vec![0x01, 0x02, 0x03]));
         assert_eq!(did_url.method(), &Method::Ethr,);
         assert_eq!(did_url.network(), &Network::Mainnet,);
-        assert_eq!(did_url.to_string(), "did:ethr:mainnet:0x010203")
+        assert_eq!(did_url.to_string(), "did:ethr:mainnet:010203")
+    }
+
+    #[test]
+    fn test_account_from_string() {
+        let account = Account::from_string("0xb9c5714089478a327f09197987f16f9e5d936e8a");
+        assert_eq!(
+            account,
+            Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
+
+        let account =
+            Account::from_string("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8");
+        assert_eq!(
+            account.to_address().unwrap(),
+            Account::Address(address("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf"))
+                .to_address()
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_account_from_hex_key() {
+        let account = Account::from_hex_key(vec![0x01, 0x02, 0x03]);
+        assert_eq!(account, Account::HexKey(vec![0x01, 0x02, 0x03]));
+    }
+
+    #[test]
+    fn test_account_from_address() {
+        let account = Account::from_address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
+        assert_eq!(
+            account,
+            Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
+    }
+
+    #[test]
+    fn test_account_to_address_conversion() {
+        let account = Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
+        assert_eq!(
+            account.to_address().unwrap(),
+            Address::from_slice(
+                &hex::decode(&"0xb9c5714089478a327f09197987f16f9e5d936e8a"[2..]).unwrap()
+            )
+        );
+
+        let account = Account::HexKey(hex::decode("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8").unwrap().to_vec());
+        assert_eq!(
+            account.to_address().unwrap(),
+            Address::from_slice(
+                &hex::decode(&"0x7e5f4552091a69125d5dfcb7b8c2659029395bdf"[2..]).unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn test_public_key_hash() {
+        let pk = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+        let key = hex::decode(pk).unwrap();
+        let address = public_key_to_address(&key);
+        assert_eq!(
+            address,
+            "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf".to_string()
+        );
     }
 }

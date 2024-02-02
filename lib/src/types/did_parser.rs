@@ -72,7 +72,7 @@ peg::parser! {
 
         rule account() -> Account
             = "0" i("x") digits:$(HEXDIG()*<40>) { Account::Address(Address::from_slice(&hex::decode(digits).unwrap())) }
-            / "0" i("x") digits:$(HEXDIG()*<66>) { Account::HexKey(hex::decode(digits).unwrap()) }
+            / digits:$(HEXDIG()*<128>) { Account::HexKey(hex::decode(digits).unwrap()) }
 
         // case insensitive rule (see https://github.com/kevinmehall/rust-peg/issues/216)
         rule i(literal: &'static str)
@@ -642,5 +642,21 @@ mod tests {
                 fragment: None
             }
         );
+    }
+
+    #[test]
+    fn test_ethr_did_parse_url_public_key() {
+        let parsed = parse_ethr_did_url("did:ethr:79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8/a/b/c#tothesection").unwrap();
+        assert_eq!(parsed.did.method, Method::Ethr);
+        assert_eq!(parsed.did.network, Network::Mainnet);
+        assert_eq!(
+            parsed.did.account.to_address().unwrap(),
+            Address::from_slice(
+                &hex::decode(&"0x7e5f4552091a69125d5dfcb7b8c2659029395bdf"[2..]).unwrap()
+            )
+        );
+        assert_eq!(parsed.path, Some("/a/b/c".to_string()));
+        assert_eq!(parsed.query, None);
+        assert_eq!(parsed.fragment, Some("tothesection".to_string()));
     }
 }

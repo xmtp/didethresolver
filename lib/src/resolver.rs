@@ -128,7 +128,7 @@ impl<M: Middleware + 'static> Resolver<M> {
         history: Vec<(DIDRegistryEvents, LogMeta)>,
     ) -> Result<DidResolutionResult, ResolverError<M>> {
         let mut base_document = DidDocument::ethr_builder();
-        base_document.public_key(&public_key)?;
+        base_document.account_address(&public_key)?;
 
         let current_block = self
             .signer
