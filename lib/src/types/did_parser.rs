@@ -64,11 +64,7 @@ peg::parser! {
             = "0" i("x") digits:$(HEXDIG()+) ":" { Network::from(digits) }
 
         rule network() -> Network
-            // chain id networks
-            = // named networks
-            "mainnet:" { Network::Mainnet }
-            / "sepolia:" { Network::Sepolia }
-            / expected!("the only supported networks are `mainnet`, `sepolia`")
+            = n:$(ALPHA()+) ":" { Network::from(n) }
 
         rule account() -> Account
             = "0" i("x") digits:$(HEXDIG()*<40>) { Account::Address(Address::from_slice(&hex::decode(digits).unwrap())) }
@@ -336,6 +332,22 @@ mod tests {
         assert!(parsed.is_ok());
         let parsed = parse_ethr_did("ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
         assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn test_ethr_network_sepolia() {
+        let parsed =
+            parse_ethr_did("did:ethr:sepolia:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        assert_eq!(
+            parsed,
+            Did {
+                method: Method::Ethr,
+                network: Network::Sepolia,
+                account: Account::Address(Address::from_slice(
+                    &hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap()
+                ))
+            }
+        );
     }
 
     #[test]
@@ -650,10 +662,10 @@ mod tests {
         assert_eq!(parsed.did.method, Method::Ethr);
         assert_eq!(parsed.did.network, Network::Mainnet);
         assert_eq!(
-            parsed.did.account.to_address().unwrap(),
             Address::from_slice(
                 &hex::decode(&"0x7e5f4552091a69125d5dfcb7b8c2659029395bdf"[2..]).unwrap()
-            )
+            ),
+            parsed.did.account.into()
         );
         assert_eq!(parsed.path, Some("/a/b/c".to_string()));
         assert_eq!(parsed.query, None);

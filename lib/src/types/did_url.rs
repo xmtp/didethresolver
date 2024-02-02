@@ -18,6 +18,18 @@ fn public_key_to_address(key: &[u8]) -> String {
     format!("0x{}", hex::encode(address)).to_string()
 }
 
+/**
+ * Convert an Ethereum address string into a hex string
+ *
+ * Returns the hex string without the 0x prefix if it exists
+ */
+fn as_hex_digits(s: &str) -> &str {
+    if s.starts_with("0x") {
+        return s.strip_prefix("0x").unwrap();
+    }
+    s
+}
+
 /// A DID URL, based on the did specification, [DID URL Syntax](https://www.w3.org/TR/did-core/#did-url-syntax)
 /// Currently only supports did:ethr: [did-ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,41 +72,45 @@ pub enum Account {
     HexKey(Vec<u8>),
 }
 
+impl From<Address> for Account {
+    fn from(addr: Address) -> Self {
+        Account::Address(addr)
+    }
+}
+
+impl From<Vec<u8>> for Account {
+    fn from(key: Vec<u8>) -> Self {
+        Account::HexKey(key)
+    }
+}
+
+impl From<&str> for Account {
+    fn from(s: &str) -> Self {
+        if s.starts_with("0x") {
+            Account::Address(Address::from_slice(&hex::decode(as_hex_digits(s)).unwrap()))
+        } else {
+            Account::HexKey(hex::decode(s).unwrap())
+        }
+    }
+}
+
+impl From<Account> for Address {
+    fn from(account: Account) -> Self {
+        match account {
+            Account::Address(addr) => addr,
+            Account::HexKey(key) => {
+                let addr = public_key_to_address(&key);
+                Address::from_slice(&hex::decode(as_hex_digits(&addr)).unwrap())
+            }
+        }
+    }
+}
+
 impl ToString for Account {
     fn to_string(&self) -> String {
         match self {
             Account::Address(addr) => format!("0x{}", hex::encode(addr.as_bytes())),
             Account::HexKey(key) => hex::encode(key).to_string(),
-        }
-    }
-}
-
-impl Account {
-    pub fn from_hex_key(key: Vec<u8>) -> Self {
-        Account::HexKey(key)
-    }
-
-    pub fn from_address(addr: Address) -> Self {
-        Account::Address(addr)
-    }
-
-    pub fn from_string(s: &str) -> Self {
-        if s.starts_with("0x") {
-            let hexes = s.strip_prefix("0x").unwrap();
-            Account::Address(Address::from_slice(&hex::decode(hexes).unwrap()))
-        } else {
-            Account::HexKey(hex::decode(s).unwrap())
-        }
-    }
-
-    pub fn to_address(&self) -> Option<Address> {
-        match self {
-            Account::Address(addr) => Some(*addr),
-            Account::HexKey(key) => {
-                let addr = public_key_to_address(key);
-                let hexes = addr.strip_prefix("0x").unwrap();
-                Some(Address::from_slice(&hex::decode(hexes).unwrap()))
-            }
         }
     }
 }
@@ -136,16 +152,30 @@ impl ToString for Network {
     }
 }
 
-impl<'a> From<&'a str> for Network {
-    fn from(chain_id: &'a str) -> Network {
-        let chain_id = usize::from_str_radix(chain_id, 16).expect("String must be valid Hex");
-
+impl From<usize> for Network {
+    fn from(chain_id: usize) -> Network {
         match chain_id {
             1 => Network::Mainnet,
             #[allow(deprecated)]
             5 => Network::Goerli,
             11155111 => Network::Sepolia,
             _ => Network::Other(chain_id),
+        }
+    }
+}
+
+impl<'a> From<&'a str> for Network {
+    fn from(network: &'a str) -> Network {
+        match network.to_lowercase().as_str() {
+            "mainnet" => Network::Mainnet,
+            #[allow(deprecated)]
+            "goerli" => Network::Goerli,
+            "sepolia" => Network::Sepolia,
+            _ => {
+                let chain_id = usize::from_str_radix(as_hex_digits(network), 16)
+                    .expect("String must be valid Hex");
+                Network::from(chain_id)
+            }
         }
     }
 }
@@ -601,31 +631,29 @@ mod tests {
 
     #[test]
     fn test_account_from_string() {
-        let account = Account::from_string("0xb9c5714089478a327f09197987f16f9e5d936e8a");
+        let account = Account::from("0xb9c5714089478a327f09197987f16f9e5d936e8a");
         assert_eq!(
             account,
             Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
         );
 
         let account =
-            Account::from_string("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8");
-        assert_eq!(
-            account.to_address().unwrap(),
-            Account::Address(address("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf"))
-                .to_address()
-                .unwrap()
-        );
+            Account::from("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8");
+        let eth_address: Address = account.into();
+        let expect_address: Address =
+            Account::Address(address("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf")).into();
+        assert_eq!(expect_address, eth_address);
     }
 
     #[test]
     fn test_account_from_hex_key() {
-        let account = Account::from_hex_key(vec![0x01, 0x02, 0x03]);
+        let account = Account::from(vec![0x01, 0x02, 0x03]);
         assert_eq!(account, Account::HexKey(vec![0x01, 0x02, 0x03]));
     }
 
     #[test]
     fn test_account_from_address() {
-        let account = Account::from_address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
+        let account = Account::from(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
         assert_eq!(
             account,
             Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
@@ -636,18 +664,18 @@ mod tests {
     fn test_account_to_address_conversion() {
         let account = Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
         assert_eq!(
-            account.to_address().unwrap(),
             Address::from_slice(
-                &hex::decode(&"0xb9c5714089478a327f09197987f16f9e5d936e8a"[2..]).unwrap()
-            )
+                &hex::decode(as_hex_digits("0xb9c5714089478a327f09197987f16f9e5d936e8a")).unwrap()
+            ),
+            account.into()
         );
 
         let account = Account::HexKey(hex::decode("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8").unwrap().to_vec());
         assert_eq!(
-            account.to_address().unwrap(),
             Address::from_slice(
-                &hex::decode(&"0x7e5f4552091a69125d5dfcb7b8c2659029395bdf"[2..]).unwrap()
-            )
+                &hex::decode(as_hex_digits("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf")).unwrap()
+            ),
+            account.into()
         );
     }
 
@@ -660,5 +688,33 @@ mod tests {
             address,
             "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf".to_string()
         );
+    }
+
+    #[test]
+    fn test_as_hex_str() {
+        let address = "0x7e575682A8E450E33eB0493f9972821aE333cd7F";
+        assert_eq!(
+            as_hex_digits(address),
+            "7e575682A8E450E33eB0493f9972821aE333cd7F"
+        );
+        let public_key = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+        assert_eq!(
+            as_hex_digits(public_key),
+            "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+        );
+    }
+
+    #[test]
+    fn test_network_from_usize() {
+        assert_eq!(Network::from(1), Network::Mainnet);
+        assert_eq!(Network::from(11155111), Network::Sepolia);
+        assert_eq!(Network::from(0x1a1), Network::Other(0x1a1));
+    }
+
+    #[test]
+    fn test_network_from_str() {
+        assert_eq!(Network::from("mainnet"), Network::Mainnet);
+        assert_eq!(Network::from("sepolia"), Network::Sepolia);
+        assert_eq!(Network::from("1a1"), Network::Other(0x1a1));
     }
 }
