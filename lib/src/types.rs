@@ -8,7 +8,6 @@ mod xmtp;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use url::Url;
 
 pub use did_parser::*;
 pub use did_url::*;
@@ -22,7 +21,7 @@ pub const NULL_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DidDocument {
     #[serde(rename = "@context")]
-    pub context: Vec<Url>,
+    pub context: Vec<String>,
     pub id: DidUrl,
     #[serde(default, rename = "alsoKnownAs", skip_serializing_if = "Vec::is_empty")]
     pub also_known_as: Vec<DidUrl>,
@@ -80,7 +79,7 @@ pub struct Service {
     pub service_type: ServiceType,
     /// The URL representing the service endpoint.
     #[serde(rename = "serviceEndpoint")]
-    pub service_endpoint: Url,
+    pub service_endpoint: String,
     /// A string listing recipient keys associated with the service.
     #[serde(rename = "recipientKeys")]
     pub recipient_keys: String,
@@ -393,7 +392,7 @@ mod test {
                     id: DidUrl::parse("did:ethr:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad")
                         .unwrap(),
                     recipient_keys: "0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad".to_string(),
-                    service_endpoint: Url::parse("https://xmtp.com/resolver").unwrap(),
+                    service_endpoint: "https://xmtp.com/resolver".into(),
                     service_type: ServiceType::Messaging,
                 }],
                 verification_method: vec![VerificationMethod {

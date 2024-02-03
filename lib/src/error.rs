@@ -30,8 +30,6 @@ pub enum DidError {
 pub enum EthrBuilderError {
     #[error(transparent)]
     Did(#[from] DidError),
-    #[error("Parsing of an endpoint or url failed {0}")]
-    Url(#[from] url::ParseError),
     #[error(transparent)]
     Hex(#[from] hex::FromHexError),
     #[error("Parsing part of ethr:did failed, {0}")]

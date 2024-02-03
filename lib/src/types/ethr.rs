@@ -25,7 +25,6 @@ use crate::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use ethers::types::{Address, Bytes, U256};
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) enum Key {
@@ -44,7 +43,7 @@ pub(super) enum Key {
 /// DID Ethr Builder
 pub struct EthrBuilder {
     /// Context of the DID
-    pub(super) context: Vec<Url>,
+    pub(super) context: Vec<String>,
     /// The DID
     pub(super) id: DidUrl,
     /// Aliases for the DID
@@ -84,10 +83,13 @@ pub struct EthrBuilder {
 impl Default for EthrBuilder {
     fn default() -> Self {
         Self {
-            context: vec![
-                Url::parse("https://www.w3.org/ns/did/v1").unwrap(),
-                Url::parse("https://w3id.org/security/suites/ed25519-2020/v2").unwrap(),
-            ],
+            context: [
+                "https://www.w3.org/ns/did/v1",
+                "https://w3id.org/security/suites/ed25519-2020/v2",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
             id: DidUrl::parse("did:ethr:0x0000000000000000000000000000000000000000").unwrap(),
             also_known_as: Default::default(),
             verification_method: Default::default(),
@@ -260,11 +262,11 @@ impl EthrBuilder {
         service: ServiceType,
     ) -> Result<(), EthrBuilderError> {
         let did = self.id.with_fragment(Some(&format!("service-{}", index)));
-        let endpoint = Url::parse(&String::from_utf8_lossy(value.as_ref()))?;
+        let endpoint = String::from_utf8_lossy(value.as_ref());
         self.service.push(Service {
             id: did,
             service_type: service,
-            service_endpoint: endpoint,
+            service_endpoint: endpoint.into(),
             recipient_keys: "".into(),
         });
         Ok(())
@@ -570,7 +572,7 @@ pub(crate) mod tests {
                 id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#service-0")
                     .unwrap(),
                 service_type: ServiceType::Messaging,
-                service_endpoint: Url::parse("https://xmtp.com/resolver").unwrap(),
+                service_endpoint: "https://xmtp.com/resolver".into(),
                 recipient_keys: "".into(),
             }]
         );
