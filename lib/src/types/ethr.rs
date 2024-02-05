@@ -5,7 +5,7 @@
 //! # Examples
 //!
 //! let mut builder = EthrBuilder::default();
-//! builder.public_key(&Address::from_str("0x872A62ABAfa278F0E0f02c1C5042D0614c3f38eb")).unwrap();
+//! builder.account_address(&Address::from_str("0x872A62ABAfa278F0E0f02c1C5042D0614c3f38eb")).unwrap();
 //! let document = builder.build();
 
 use std::{collections::HashMap, str::FromStr};
@@ -116,8 +116,14 @@ impl EthrBuilder {
     }
 
     /// set the identity of the document
-    pub fn public_key(&mut self, key: &Address) -> Result<(), EthrBuilderError> {
-        self.id.set_account(types::Account::Address(*key));
+    pub fn account_address(&mut self, key: &Address) -> Result<(), EthrBuilderError> {
+        self.id = self.id.with_account(types::Account::Address(*key));
+        Ok(())
+    }
+
+    /// set the identity of the document
+    pub fn public_key(&mut self, key: &[u8]) -> Result<(), EthrBuilderError> {
+        self.id = self.id.with_account(types::Account::HexKey(key.to_vec()));
         Ok(())
     }
 
@@ -128,8 +134,7 @@ impl EthrBuilder {
 
     /// Set the controller of the document
     pub fn controller(&mut self, controller: &Address) -> Result<(), EthrBuilderError> {
-        let mut did = self.id.clone();
-        did.set_account(types::Account::Address(*controller));
+        let did = self.id.with_account(types::Account::Address(*controller));
         self.controller = Some(did);
         Ok(())
     }
@@ -254,8 +259,7 @@ impl EthrBuilder {
         value: V,
         service: ServiceType,
     ) -> Result<(), EthrBuilderError> {
-        let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("service-{}", index)));
+        let did = self.id.with_fragment(Some(&format!("service-{}", index)));
         let endpoint = Url::parse(&String::from_utf8_lossy(value.as_ref()))?;
         self.service.push(Service {
             id: did,
@@ -280,9 +284,7 @@ impl EthrBuilder {
         value: V,
         key: PublicKey,
     ) -> Result<(), EthrBuilderError> {
-        let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("delegate-{}", index)));
-
+        let did = self.id.with_fragment(Some(&format!("delegate-{}", index)));
         let method = VerificationMethod {
             id: did,
             controller: self.id.clone(),
@@ -332,8 +334,7 @@ impl EthrBuilder {
     ///
     /// reference: [spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
     pub fn delegate(&mut self, index: usize, delegate: &Address, purpose: KeyPurpose) {
-        let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("delegate-{}", index)));
+        let did = self.id.with_fragment(Some(&format!("delegate-{}", index)));
 
         // TODO: Handle ChainID
         let method = VerificationMethod {
@@ -360,7 +361,7 @@ impl EthrBuilder {
     /// Handle controller changes according to [owner changed](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#controller-changes-didownerchanged) and [registration](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#create-register)
     fn build_controller(&mut self) {
         let mut controller = self.controller.clone().unwrap_or(self.id.clone());
-        controller.set_fragment(Some("controller"));
+        controller = controller.with_fragment(Some("controller"));
 
         self.verification_method.push(VerificationMethod {
             id: controller.clone(),
@@ -374,8 +375,7 @@ impl EthrBuilder {
         // if we are resolving for a key that is a public key which matches the id, we need to add
         // another `controllerKey` verification method
         if let Account::HexKey(_) = self.id.account() {
-            let mut controller_key = self.id.clone();
-            controller_key.set_fragment(Some("controllerKey"));
+            let controller_key = self.id.with_fragment(Some("controllerKey"));
             self.verification_method.push(VerificationMethod {
                 id: controller_key.clone(),
                 controller: self.id.clone(),
@@ -471,7 +471,7 @@ pub(crate) mod tests {
         };
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         builder.attribute_event(event).unwrap();
         let doc = builder.build().unwrap();
@@ -490,17 +490,18 @@ pub(crate) mod tests {
             }
         )
     }
+
     #[test]
     fn test_attribute_changed_ed25519() {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let event = DidattributeChangedFilter {
-            name: *b"did/pub/Secp256k1/veriKey/base58",
+            name: *b"did/pub/Ed25519/veriKey/base58  ",
             value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
             ..base_attr_changed(identity, None)
         };
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         builder.attribute_event(event).unwrap();
         let doc = builder.build().unwrap();
@@ -509,7 +510,7 @@ pub(crate) mod tests {
             VerificationMethod {
                 id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
                     .unwrap(),
-                verification_type: KeyType::EcdsaSecp256k1VerificationKey2019,
+                verification_type: KeyType::Ed25519VerificationKey2020,
                 controller: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f")
                     .unwrap(),
                 verification_properties: Some(VerificationMethodProperties::PublicKeyBase58 {
@@ -529,7 +530,7 @@ pub(crate) mod tests {
         };
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         builder.attribute_event(event).unwrap();
         let doc = builder.build().unwrap();
@@ -559,7 +560,7 @@ pub(crate) mod tests {
         };
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         builder.attribute_event(event).unwrap();
         let doc = builder.build().unwrap();
@@ -607,7 +608,7 @@ pub(crate) mod tests {
         ];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
 
         for event in events {
@@ -663,7 +664,7 @@ pub(crate) mod tests {
         ];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::from(100));
         for event in events {
             builder.attribute_event(event).unwrap();
@@ -691,7 +692,7 @@ pub(crate) mod tests {
         };
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         builder.owner_event(event).unwrap();
 
@@ -722,7 +723,7 @@ pub(crate) mod tests {
         ];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         for event in events {
             builder.delegate_event(event).unwrap();
@@ -798,7 +799,7 @@ pub(crate) mod tests {
         ];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         for event in &events {
             builder.delegate_event(event.clone()).unwrap();
@@ -808,7 +809,7 @@ pub(crate) mod tests {
         assert_eq!(builder.keys.len(), 2);
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::from(75));
         for event in &events {
             builder.delegate_event(event.clone()).unwrap();
@@ -817,7 +818,7 @@ pub(crate) mod tests {
         assert_eq!(builder.keys.len(), 1);
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::from(125));
         for event in &events {
             builder.delegate_event(event.clone()).unwrap();
@@ -860,7 +861,7 @@ pub(crate) mod tests {
         ];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
 
         builder.attribute_event(attributes[0].clone()).unwrap();
@@ -905,7 +906,7 @@ pub(crate) mod tests {
         ];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         for event in events {
             builder.owner_event(event).unwrap();
@@ -936,7 +937,7 @@ pub(crate) mod tests {
         };
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
 
         builder.attribute_event(event).unwrap();

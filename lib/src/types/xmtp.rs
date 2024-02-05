@@ -84,18 +84,17 @@ impl EthrBuilder {
         value: V,
         key: XmtpAttribute,
     ) -> Result<(), EthrBuilderError> {
-        let mut did = self.id.clone();
-        did.set_fragment(Some(&format!("xmtp-{}", index)));
-
         log::debug!("index: {}", index);
-        let mut method = VerificationMethod {
-            id: did,
+        let did_url = self
+            .id
+            .with_fragment(Some(&format!("xmtp-{}", index)))
+            .with_query("meta", Some(&key.purpose.to_string()));
+        let method = VerificationMethod {
+            id: did_url,
             controller: self.id.clone(),
             verification_type: KeyType::Ed25519VerificationKey2020,
             verification_properties: Self::encode_attribute_value(value, key.encoding)?,
         };
-
-        method.id.add_query("meta", Some(&key.purpose.to_string()));
 
         match key.purpose {
             XmtpKeyPurpose::Installation => {
@@ -128,7 +127,7 @@ mod test {
         }];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
 
         for attr in attributes {
@@ -140,7 +139,7 @@ mod test {
         assert_eq!(doc.verification_method[1].id.fragment().unwrap(), "xmtp-0");
         assert_eq!(
             doc.verification_method[1].id.query().unwrap(),
-            "?meta=installation"
+            vec![("meta".to_string(), "installation".to_string())]
         );
         assert_eq!(doc.verification_method.len(), 2);
 
@@ -157,7 +156,7 @@ mod test {
         }];
 
         let mut builder = EthrBuilder::default();
-        builder.public_key(&identity).unwrap();
+        builder.account_address(&identity).unwrap();
         builder.now(U256::from(100));
 
         for attr in attributes {

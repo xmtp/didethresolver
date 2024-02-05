@@ -2587,7 +2587,6 @@ dependencies = [
  "smart-default",
  "surf",
  "thiserror",
- "tiny-keccak",
  "tokio",
  "tokio-test",
  "tracing",

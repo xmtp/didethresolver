@@ -1,20 +1,42 @@
 //! Convenience Wrapper around [`Url`] for DID URIs according to the [DID Spec](https://www.w3.org/TR/did-core/#did-syntax)
 
-use ethers::types::Address;
 use serde::{Deserialize, Serialize, Serializer};
 use smart_default::SmartDefault;
-use url::Url;
 
-use super::parse_ethr_did;
+use ethers::{types::Address, utils::keccak256};
+
+use super::parse_ethr_did_url;
 use crate::error::DidError;
+
+/**
+ * Converts a public key to an ethereum address.  The last 20 bytes
+ * of the keccak256 hash of the public key is returned
+ */
+fn public_key_to_address(key: &[u8]) -> String {
+    let keydigest = keccak256(key);
+    let address = &keydigest[12..];
+    format!("0x{}", hex::encode(address)).to_string()
+}
+
+/**
+ * Convert an Ethereum address string into a hex string
+ *
+ * Returns the hex string without the 0x prefix if it exists
+ */
+fn as_hex_digits(s: &str) -> &str {
+    if s.starts_with("0x") {
+        return s.strip_prefix("0x").unwrap();
+    }
+    s
+}
 
 /// A DID URL, based on the did specification, [DID URL Syntax](https://www.w3.org/TR/did-core/#did-url-syntax)
 /// Currently only supports did:ethr: [did-ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DidUrl {
     pub did: Did,
-    pub path: String,
-    pub query: Vec<(String, String)>,
+    pub path: Option<String>,
+    pub query: Option<Vec<(String, String)>>,
     pub fragment: Option<String>,
 }
 
@@ -50,11 +72,45 @@ pub enum Account {
     HexKey(Vec<u8>),
 }
 
+impl From<Address> for Account {
+    fn from(addr: Address) -> Self {
+        Account::Address(addr)
+    }
+}
+
+impl From<Vec<u8>> for Account {
+    fn from(key: Vec<u8>) -> Self {
+        Account::HexKey(key)
+    }
+}
+
+impl From<&str> for Account {
+    fn from(s: &str) -> Self {
+        if s.starts_with("0x") {
+            Account::Address(Address::from_slice(&hex::decode(as_hex_digits(s)).unwrap()))
+        } else {
+            Account::HexKey(hex::decode(s).unwrap())
+        }
+    }
+}
+
+impl From<Account> for Address {
+    fn from(account: Account) -> Self {
+        match account {
+            Account::Address(addr) => addr,
+            Account::HexKey(key) => {
+                let addr = public_key_to_address(&key);
+                Address::from_slice(&hex::decode(as_hex_digits(&addr)).unwrap())
+            }
+        }
+    }
+}
+
 impl ToString for Account {
     fn to_string(&self) -> String {
         match self {
             Account::Address(addr) => format!("0x{}", hex::encode(addr.as_bytes())),
-            Account::HexKey(key) => format!("0x{}", hex::encode(key)),
+            Account::HexKey(key) => hex::encode(key).to_string(),
         }
     }
 }
@@ -96,16 +152,30 @@ impl ToString for Network {
     }
 }
 
-impl<'a> From<&'a str> for Network {
-    fn from(chain_id: &'a str) -> Network {
-        let chain_id = usize::from_str_radix(chain_id, 16).expect("String must be valid Hex");
-
+impl From<usize> for Network {
+    fn from(chain_id: usize) -> Network {
         match chain_id {
             1 => Network::Mainnet,
             #[allow(deprecated)]
             5 => Network::Goerli,
             11155111 => Network::Sepolia,
             _ => Network::Other(chain_id),
+        }
+    }
+}
+
+impl<'a> From<&'a str> for Network {
+    fn from(network: &'a str) -> Network {
+        match network.to_lowercase().as_str() {
+            "mainnet" => Network::Mainnet,
+            #[allow(deprecated)]
+            "goerli" => Network::Goerli,
+            "sepolia" => Network::Sepolia,
+            _ => {
+                let chain_id = usize::from_str_radix(as_hex_digits(network), 16)
+                    .expect("String must be valid Hex");
+                Network::from(chain_id)
+            }
         }
     }
 }
@@ -129,7 +199,7 @@ impl DidUrl {
     ///
     /// let did_url = "did:not:123";
     /// let did_url = DidUrl::parse(did_url).unwrap_err();
-    /// assert_eq!(did_url.to_string(), "Parsing of ethr:did failed, error at 1:1: expected one of \"ethr\", the only supported method is `ethr`");
+    /// assert_eq!(did_url.to_string(), "Parsing of ethr:did failed, error at 1:5: expected one of \"ethr\", the only supported method is `ethr`");
     /// ```
     /// ```
     /// use lib_didethresolver::types::DidUrl;
@@ -143,37 +213,13 @@ impl DidUrl {
     /// components (method name, method-specific ID) do not conform to the expected DID structure.
     ///
     pub fn parse<S: AsRef<str>>(input: S) -> Result<Self, DidError> {
-        let url = Url::parse(input.as_ref())?;
+        let did_url = parse_ethr_did_url(input.as_ref());
+        if let Err(e) = did_url {
+            return Err(DidError::Parse(e));
+        }
 
-        // Note that `url.path()` will return an incorrect path from did url
-        // For regular URL("http://w.a.b/path"), the it only returns the string from the first '/' (/path)
-        // But for did url, it incorrectly returns the content before the first '/' (ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a/path)
-        let mut split = url.path().split('/');
-        let did = if let Some(did_str) = split.next() {
-            log::debug!("Parsing did from str: {}", did_str);
-            Some(parse_ethr_did(did_str)?)
-        } else {
-            None
-        };
-        // join the strings in the split with '/' as delimiter
-        let path = split.fold(String::new(), |mut acc, s| {
-            acc.push_str(format!("/{}", s).as_str());
-            acc
-        });
-
-        let query = url
-            .query_pairs()
-            .map(|(k, v)| (k.into_owned(), v.into_owned()))
-            .collect();
-
-        let fragment = url.fragment().map(|fragment| fragment.to_owned());
-
-        Ok(Self {
-            did: did.unwrap_or_default(),
-            path,
-            query,
-            fragment,
-        })
+        let did_url = did_url.unwrap();
+        Ok(Self { ..did_url })
     }
 
     /// Retrieves the method from the DID URL, as defined in the [did-ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)).
@@ -232,26 +278,45 @@ impl DidUrl {
     }
 
     /// Retrieves the path part from the DID URL, as defined in the [did-ethr spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)).
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
-    pub fn query(&self) -> Option<String> {
-        let q = self.format_query();
-        Some(q).filter(|q| !q.is_empty())
-    }
-
-    pub fn query_pairs(&self) -> impl Iterator<Item = &(String, String)> {
-        self.query.iter()
-    }
-
-    pub fn add_query(&mut self, key: &str, value: Option<&str>) {
-        self.query
-            .push((key.to_string(), value.unwrap_or("").to_string()));
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_deref()
     }
 
     pub fn contains_query(&self, key: String, value: String) -> bool {
-        self.query.contains(&(key, value))
+        self.query
+            .as_ref()
+            .map(|q| q.contains(&(key, value)))
+            .unwrap_or(false)
+    }
+
+    pub fn query(&self) -> Option<&[(String, String)]> {
+        self.query.as_deref()
+    }
+
+    /// Immutable copy constructor that returns the same DID URL without its query
+    pub fn without_query(&self) -> Self {
+        let mut minion = self.clone();
+        minion.query = None;
+        minion
+    }
+
+    /// Immutable copy constructor to add a query parameter to the DID URL.
+    /// # Examples
+    /// ```rust
+    /// use lib_didethresolver::types::DidUrl;
+    /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+    /// let did_url = did_url.with_query("versionId", Some("1"));
+    /// assert_eq!(did_url.query(), Some(&[("versionId".to_string(), "1".to_string())][..]));
+    /// ```
+    /// **Note**: the parser did not percent-encode this component, but the input may have been percent-encoded already.
+    pub fn with_query(&self, key: &str, value: Option<&str>) -> Self {
+        let mut minion = self.clone();
+        if minion.query.is_none() {
+            minion.query = Some(Vec::new());
+        }
+        let query = minion.query.as_mut().unwrap();
+        query.push((key.to_string(), value.unwrap_or("").to_string()));
+        minion
     }
 
     /// Returns this DID's fragment identifier, if any.
@@ -273,69 +338,77 @@ impl DidUrl {
         self.fragment.as_deref()
     }
 
-    /// Change this DID's fragment identifier
+    /// Immutable copy builder to add a fragment to this did url
     /// # Examples
-    ///
-    ///
-    /// ```
+    /// ```rust
     /// use lib_didethresolver::types::DidUrl;
-    ///
-    /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-    /// did_url.set_fragment(Some("controller"));
+    /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+    /// let did_url = did_url.with_fragment(Some(&"controller"));
     /// assert_eq!(did_url.fragment(), Some("controller"));
     /// ```
-    pub fn set_fragment(&mut self, fragment: Option<&str>) {
-        // replace the fragment
+    /// **Note**: the parser did not percent-encode this component, but the input may have been percent-encoded already.
+    ///
+    pub fn with_fragment(&self, fragment: Option<&str>) -> Self {
+        let mut minion = self.clone();
         if let Some(fragment) = fragment {
-            self.fragment = Some(fragment.to_string());
+            minion.fragment = Some(fragment.to_string());
         } else {
-            self.fragment = None;
+            minion.fragment = None;
         }
+        minion
     }
 
-    /// Change this DID's path
+    /// Immutable copy constructor returns an identical DID with the specified path
     ///
     /// # Examples
     /// ```
     /// use lib_didethresolver::types::DidUrl;
     ///
-    /// let mut did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-    /// did_url.set_path("/path/to/resource");
-    /// assert_eq!(did_url.path, "/path/to/resource");
+    /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+    /// let did_url = did_url.with_path(Some(&"/path/to/resource"));
+    /// assert_eq!(did_url.path, Some("/path/to/resource".to_string()));
     /// ```
     ///
-    pub fn set_path(&mut self, path: &str) {
-        self.path = path.to_string();
+    pub fn with_path(&self, path: Option<&str>) -> Self {
+        let mut minion = self.clone();
+        if let Some(path) = path {
+            minion.path = Some(path.to_string());
+        } else {
+            minion.path = None;
+        }
+        minion
     }
 
-    pub fn set_account(&mut self, account: Account) {
-        self.did.account = account;
-    }
-
-    fn format_query(&self) -> String {
-        let mut full_query = String::new();
-        let mut pairs = self.query_pairs();
-
-        if let Some((key, value)) = pairs.next() {
-            full_query.push_str(&format!("?{}={}", key, value));
-        }
-        for (key, value) in pairs {
-            let query = format!("&{}={}", key, value);
-            full_query.push_str(&query);
-        }
-        full_query
+    /// Immutable copy constructor returns an identical DID with the specified account
+    ///
+    /// # Examples
+    /// ```rust
+    /// use lib_didethresolver::types::{Account, DidUrl};
+    /// use ethers::types::Address;
+    /// let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+    /// let address = hex::decode("b9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+    /// let account = Account::Address(Address::from_slice(address.as_slice()));
+    /// let did_url = did_url.with_account(account.clone());
+    /// assert_eq!(did_url.account(), &account);
+    /// ```
+    pub fn with_account(&self, account: Account) -> Self {
+        let mut minion = self.clone();
+        minion.did.account = account.clone();
+        minion
     }
 }
 
 impl ToString for DidUrl {
     fn to_string(&self) -> String {
-        let mut string = format!(
-            "{}{}{}",
-            self.did.to_string(),
-            self.path(),
-            self.format_query()
-        );
-
+        let mut string = format!("{}{}", self.did.to_string(), self.path().unwrap_or(""));
+        if let Some(query) = self.query() {
+            let format_str = query
+                .iter()
+                .map(|(key, value)| format!("{}={}", key, value))
+                .collect::<Vec<String>>()
+                .join("&");
+            string = format!("{}?{}", string, format_str);
+        }
         if let Some(fragment) = self.fragment() {
             string = format!("{}#{}", string, fragment);
         }
@@ -380,7 +453,7 @@ mod tests {
 
         let err = DidUrl::parse("did:pkh:0x7e575682A8E450E33eB0493f9972821aE333cd7F").unwrap_err();
         assert_eq!(
-            "Parsing of ethr:did failed, error at 1:1: expected one of \"ethr\", the only supported method is `ethr`"
+            "Parsing of ethr:did failed, error at 1:5: expected one of \"ethr\", the only supported method is `ethr`"
                 .to_string(),
             err.to_string()
         );
@@ -466,71 +539,209 @@ mod tests {
     }
 
     #[test]
-    fn test_set_fragment() {
-        let mut did_url =
+    fn test_with_fragment() {
+        let did_url =
             DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#key-1").unwrap();
         assert_eq!(did_url.fragment(), Some("key-1"));
-
-        did_url.set_fragment(Some("key-2"));
+        let last = did_url.clone();
+        let did_url = did_url.with_fragment(Some("key-2"));
         assert_eq!(did_url.fragment(), Some("key-2"));
-
-        did_url.set_fragment(None);
+        assert_eq!(last.fragment(), Some("key-1"));
+        let did_url = did_url.with_fragment(None);
         assert_eq!(did_url.fragment(), None);
-    }
-
-    #[test]
-    fn test_set_path() {
-        let mut did_url =
-            DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
-        assert_eq!(did_url.path(), "");
-
-        did_url.set_path("path-2");
-        assert_eq!(did_url.path(), "path-2");
-    }
-
-    #[test]
-    fn test_add_query() {
-        let mut did_url =
-            DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
-        did_url.add_query("meta", Some("test"));
+        assert_eq!(did_url.method(), &Method::Ethr,);
+        assert_eq!(did_url.network(), &Network::Mainnet,);
         assert_eq!(
-            did_url.to_string(),
-            "did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=test"
+            did_url.account(),
+            &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
         );
     }
 
     #[test]
-    fn test_multiple_queries() {
-        let mut did_url =
-            DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
-        did_url.add_query("meta", Some("hi"));
-        did_url.add_query("username", None);
-        did_url.add_query("password", Some("hunter2"));
-
+    fn test_with_path() {
+        let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        assert_eq!(did_url.path(), None);
+        let did_url = did_url.with_path(Some("path-2"));
+        assert_eq!(did_url.path(), Some("path-2"));
+        assert_eq!(did_url.method(), &Method::Ethr,);
+        assert_eq!(did_url.network(), &Network::Mainnet,);
         assert_eq!(
-            did_url.to_string(),
-            "did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=hi&username=&password=hunter2"
-        )
+            did_url.account(),
+            &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
+        let did_url = did_url.with_path(None);
+        assert_eq!(did_url.path(), None);
     }
 
     #[test]
-    fn test_add_empty_query() {
-        let mut did_url =
-            DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
-        did_url.add_query("meta", None);
+    fn test_without_query() {
+        let did_url =
+            DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a?versionId=1")
+                .unwrap()
+                .without_query();
+        assert_eq!(did_url.query(), None);
+        assert_eq!(did_url.method(), &Method::Ethr,);
+        assert_eq!(did_url.network(), &Network::Mainnet,);
         assert_eq!(
-            did_url.to_string(),
-            "did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta="
+            did_url.account(),
+            &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
         );
     }
 
     #[test]
-    fn test_query_parses() {
+    fn test_with_query() {
+        let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        assert_eq!(did_url.query(), None);
+        let last = did_url.clone();
+        let did_url = did_url.with_query("key-1", Some("value-1"));
+        assert_eq!(last.query(), None);
+        assert_eq!(
+            did_url.query(),
+            Some(&[("key-1".to_string(), "value-1".to_string())][..])
+        );
+        let did_url = did_url.with_query("key-2", Some("value-2"));
+        assert_eq!(
+            did_url.query(),
+            Some(
+                &[
+                    ("key-1".to_string(), "value-1".to_string()),
+                    ("key-2".to_string(), "value-2".to_string())
+                ][..]
+            )
+        );
+        assert_eq!(did_url.method(), &Method::Ethr,);
+        assert_eq!(did_url.network(), &Network::Mainnet,);
+        assert_eq!(
+            did_url.account(),
+            &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
+    }
+
+    #[test]
+    fn test_with_account() {
+        let did_url = DidUrl::parse("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a").unwrap();
+        assert_eq!(
+            did_url.account(),
+            &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
+        let last = did_url.clone();
+        let did_url = did_url.with_account(Account::HexKey(vec![0x01, 0x02, 0x03]));
+        assert_eq!(
+            last.account(),
+            &Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
+        assert_eq!(did_url.account(), &Account::HexKey(vec![0x01, 0x02, 0x03]));
+        assert_eq!(did_url.method(), &Method::Ethr,);
+        assert_eq!(did_url.network(), &Network::Mainnet,);
+        assert_eq!(did_url.to_string(), "did:ethr:mainnet:010203")
+    }
+
+    #[test]
+    fn test_account_from_string() {
+        let account = Account::from("0xb9c5714089478a327f09197987f16f9e5d936e8a");
+        assert_eq!(
+            account,
+            Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
+
+        let account =
+            Account::from("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8");
+        let eth_address: Address = account.into();
+        let expect_address: Address =
+            Account::Address(address("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf")).into();
+        assert_eq!(expect_address, eth_address);
+    }
+
+    #[test]
+    fn test_account_from_hex_key() {
+        let account = Account::from(vec![0x01, 0x02, 0x03]);
+        assert_eq!(account, Account::HexKey(vec![0x01, 0x02, 0x03]));
+    }
+
+    #[test]
+    fn test_account_from_address() {
+        let account = Account::from(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
+        assert_eq!(
+            account,
+            Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+        );
+    }
+
+    #[test]
+    fn test_account_to_address_conversion() {
+        let account = Account::Address(address("0xb9c5714089478a327f09197987f16f9e5d936e8a"));
+        assert_eq!(
+            Address::from_slice(
+                &hex::decode(as_hex_digits("0xb9c5714089478a327f09197987f16f9e5d936e8a")).unwrap()
+            ),
+            account.into()
+        );
+
+        let account = Account::HexKey(hex::decode("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8").unwrap().to_vec());
+        assert_eq!(
+            Address::from_slice(
+                &hex::decode(as_hex_digits("0x7e5f4552091a69125d5dfcb7b8c2659029395bdf")).unwrap()
+            ),
+            account.into()
+        );
+    }
+
+    #[test]
+    fn test_public_key_hash() {
+        let pk = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+        let key = hex::decode(pk).unwrap();
+        let address = public_key_to_address(&key);
+        assert_eq!(
+            address,
+            "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf".to_string()
+        );
+    }
+
+    #[test]
+    fn test_as_hex_str() {
+        let address = "0x7e575682A8E450E33eB0493f9972821aE333cd7F";
+        assert_eq!(
+            as_hex_digits(address),
+            "7e575682A8E450E33eB0493f9972821aE333cd7F"
+        );
+        let public_key = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+        assert_eq!(
+            as_hex_digits(public_key),
+            "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+        );
+    }
+
+    #[test]
+    fn test_network_from_usize() {
+        assert_eq!(Network::from(1), Network::Mainnet);
+        assert_eq!(Network::from(11155111), Network::Sepolia);
+        assert_eq!(Network::from(0x1a1), Network::Other(0x1a1));
+    }
+
+    #[test]
+    fn test_network_from_str() {
+        assert_eq!(Network::from("mainnet"), Network::Mainnet);
+        assert_eq!(Network::from("sepolia"), Network::Sepolia);
+        assert_eq!(Network::from("1a1"), Network::Other(0x1a1));
+    }
+
+    #[test]
+    fn test_contains_query() {
         let did_url = DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=hi&username=&password=hunter2").unwrap();
 
-        let mut pairs = did_url.query_pairs();
-        assert_eq!(pairs.next(), Some(&("meta".into(), "hi".into())));
-        assert_eq!(pairs.next(), Some(&("username".into(), "".into())));
-        assert_eq!(pairs.next(), Some(&("password".into(), "hunter2".into())));
+        assert_eq!(did_url.contains_query("meta".into(), "hi".into()), true);
+        assert_eq!(did_url.contains_query("username".into(), "".into()), true);
+        assert_eq!(
+            did_url.contains_query("password".into(), "hunter2".into()),
+            true
+        );
+        assert_eq!(
+            did_url.contains_query("does".into(), "not exist".into()),
+            false
+        );
+
+        let did_url =
+            DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
+        assert_eq!(did_url.contains_query("no".into(), "queries".into()), false);
     }
 }

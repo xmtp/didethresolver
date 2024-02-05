@@ -23,8 +23,6 @@ pub enum ResolverError<M: Middleware> {
 pub enum DidError {
     #[error("Parsing of ethr:did failed, {0}")]
     Parse(#[from] peg::error::ParseError<peg::str::LineCol>),
-    #[error(transparent)]
-    Url(#[from] url::ParseError),
 }
 
 /// Errors originating during the construction of a ethr:did document [`EthrBuilder`](crate::types::EthrBuilder)
