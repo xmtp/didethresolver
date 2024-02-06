@@ -581,4 +581,39 @@ mod test {
             s.chars().take(32).collect::<String>()
         );
     }
+
+    #[test]
+    fn test_verification_method_properties_converts_to_bytes() {
+        let prop = VerificationMethodProperties::PublicKeyHex {
+            public_key_hex: "0000000000000000000000000000000000000000".to_string(),
+        };
+        let bytes: Vec<u8> = prop.try_into().unwrap();
+        assert_eq!(
+            bytes,
+            hex::decode("0000000000000000000000000000000000000000").unwrap()
+        );
+
+        let b64 = BASE64.encode("base64");
+        let prop = VerificationMethodProperties::PublicKeyBase64 {
+            public_key_base64: b64.clone(),
+        };
+        let bytes: Vec<u8> = prop.try_into().unwrap();
+        assert_eq!(bytes, BASE64.decode(b64).unwrap());
+
+        let b58 = bs58::encode("base58").into_string();
+        let prop = VerificationMethodProperties::PublicKeyBase58 {
+            public_key_base58: b58.clone(),
+        };
+        let bytes: Vec<u8> = prop.try_into().unwrap();
+        assert_eq!(bytes, bs58::decode(b58.clone()).into_vec().unwrap());
+
+        let prop = VerificationMethodProperties::BlockchainAccountId {
+            blockchain_account_id: "0000000000000000000000000000000000000000".to_string(),
+        };
+        let bytes: Vec<u8> = prop.try_into().unwrap();
+        assert_eq!(
+            bytes,
+            hex::decode("0000000000000000000000000000000000000000").unwrap()
+        );
+    }
 }

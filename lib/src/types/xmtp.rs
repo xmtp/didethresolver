@@ -198,4 +198,17 @@ mod test {
         assert_eq!(purpose.to_string(), "installation");
         assert_eq!(String::from(purpose), "installation");
     }
+
+    #[test]
+    fn test_xmtp_attribute_bytes() {
+        let attr = XmtpAttribute {
+            purpose: XmtpKeyPurpose::Installation,
+            encoding: KeyEncoding::Hex,
+        };
+
+        assert_eq!(
+            b"xmtp/installation/hex           ".as_slice(),
+            <[u8; 32]>::from(attr)
+        );
+    }
 }
