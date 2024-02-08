@@ -729,20 +729,14 @@ mod tests {
     fn test_contains_query() {
         let did_url = DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=hi&username=&password=hunter2").unwrap();
 
-        assert_eq!(did_url.contains_query("meta".into(), "hi".into()), true);
-        assert_eq!(did_url.contains_query("username".into(), "".into()), true);
-        assert_eq!(
-            did_url.contains_query("password".into(), "hunter2".into()),
-            true
-        );
-        assert_eq!(
-            did_url.contains_query("does".into(), "not exist".into()),
-            false
-        );
+        assert!(did_url.contains_query("meta".into(), "hi".into()));
+        assert!(did_url.contains_query("username".into(), "".into()));
+        assert!(did_url.contains_query("password".into(), "hunter2".into()));
+        assert!(!did_url.contains_query("does".into(), "not exist".into()));
 
         let did_url =
             DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
-        assert_eq!(did_url.contains_query("no".into(), "queries".into()), false);
+        assert!(!did_url.contains_query("no".into(), "queries".into()));
     }
 
     #[test]
