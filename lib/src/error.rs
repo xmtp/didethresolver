@@ -68,3 +68,18 @@ pub enum TypeError {
     #[error(transparent)]
     Base64Conversion(#[from] base64::DecodeError),
 }
+
+#[cfg(test)]
+mod tests {
+    use ethers::providers::{MockProvider, Provider};
+
+    use super::*;
+
+    #[test]
+    fn test_resolver_error() {
+        let err = ResolverError::<Provider<MockProvider>>::Middleware("test".to_string());
+        let err_obj: ErrorObjectOwned = err.into();
+        assert_eq!(err_obj.code(), -31000);
+        assert_eq!(err_obj.message(), "test");
+    }
+}

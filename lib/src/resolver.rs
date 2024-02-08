@@ -220,3 +220,16 @@ impl<M: Middleware + 'static> Resolver<M> {
         self.registry.client()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_registry() {
+        let (provider, _) = ethers::providers::Provider::mocked();
+        let registry = DIDRegistry::new(Address::zero(), Arc::new(provider));
+        let resolver = Resolver::from(registry);
+        assert_eq!(resolver.registry.address(), Address::zero());
+    }
+}

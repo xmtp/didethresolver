@@ -744,4 +744,11 @@ mod tests {
             DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
         assert_eq!(did_url.contains_query("no".into(), "queries".into()), false);
     }
+
+    #[test]
+    fn test_network_to_string() {
+        assert_eq!(Network::Mainnet.to_string(), "mainnet");
+        assert_eq!(Network::Sepolia.to_string(), "sepolia");
+        assert_eq!(Network::Other(0x1a1).to_string(), "417");
+    }
 }
