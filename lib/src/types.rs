@@ -6,6 +6,8 @@ mod did_url;
 mod ethr;
 mod xmtp;
 
+use crate::error::TypeError;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use url::Url;
@@ -120,21 +122,32 @@ pub enum VerificationMethodProperties {
         #[serde(rename = "publicKeyBase58")]
         public_key_base58: String,
     },
-    /// Public key as a Json-Web-Key
-    PublicKeyJwk {
-        #[serde(rename = "publicKeyJwk")]
-        public_key_jwk: String,
-    },
-    /// Public key in Multibase format
-    PublicKeyMultibase {
-        #[serde(rename = "publicKeyMultibase")]
-        public_key_multibase: String,
-    },
     /// Blockcahin account identitfier, case insensitive (does not support EIP-55)
     BlockchainAccountId {
         #[serde(rename = "blockchainAccountId")]
         blockchain_account_id: String,
     },
+}
+
+impl TryFrom<VerificationMethodProperties> for Vec<u8> {
+    type Error = TypeError;
+
+    fn try_from(prop: VerificationMethodProperties) -> Result<Vec<u8>, Self::Error> {
+        match prop {
+            VerificationMethodProperties::PublicKeyHex { public_key_hex } => {
+                Ok(hex::decode(public_key_hex)?)
+            }
+            VerificationMethodProperties::PublicKeyBase64 { public_key_base64 } => {
+                Ok(BASE64.decode(public_key_base64)?)
+            }
+            VerificationMethodProperties::PublicKeyBase58 { public_key_base58 } => {
+                Ok(bs58::decode(public_key_base58).into_vec()?)
+            }
+            VerificationMethodProperties::BlockchainAccountId {
+                blockchain_account_id,
+            } => Ok(hex::decode(blockchain_account_id)?),
+        }
+    }
 }
 
 /// Represents different types of services associated with a DID.
@@ -253,12 +266,18 @@ impl From<Attribute> for String {
 // will be cutoff.
 impl From<Attribute> for [u8; 32] {
     fn from(attribute: Attribute) -> [u8; 32] {
-        let mut attr_bytes: [u8; 32] = [b' '; 32];
-        let attr_string = attribute.to_string();
-        let length = std::cmp::min(attr_string.as_bytes().len(), 32);
-        attr_bytes[0..length].copy_from_slice(&attr_string.as_bytes()[0..length]);
-        attr_bytes
+        string_to_bytes32(attribute.to_string())
     }
+}
+
+// internal function to fill a [u8; 32] with bytes.
+// anything over 32 bytes will be cutoff.
+fn string_to_bytes32<S: AsRef<str>>(s: S) -> [u8; 32] {
+    let s = s.as_ref();
+    let mut attr_bytes: [u8; 32] = [b' '; 32];
+    let length = std::cmp::min(s.as_bytes().len(), 32);
+    attr_bytes[0..length].copy_from_slice(&s.as_bytes()[0..length]);
+    attr_bytes
 }
 
 /// Indicates the encoding of a key in a did:ethr attribute
@@ -369,7 +388,7 @@ mod test {
               {
                 "controller": "did:ethr:mainnet:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
                 "id": "did:ethr:mainnet:0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
-                "publicKeyMultibase": "0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
+                "blockchainAccountId": "0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad",
                 "type": "Ed25519VerificationKey2020"
               }
             ]
@@ -405,8 +424,8 @@ mod test {
                     .unwrap(),
                     verification_type: KeyType::Ed25519VerificationKey2020,
                     verification_properties: Some(
-                        VerificationMethodProperties::PublicKeyMultibase {
-                            public_key_multibase: "0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad"
+                        VerificationMethodProperties::BlockchainAccountId {
+                            blockchain_account_id: "0x6ceb0bf1f28ca4165d5c0a04f61dc733987ed6ad"
                                 .to_string(),
                         }
                     ),
@@ -544,5 +563,57 @@ mod test {
 
         let encoding = KeyEncoding::Base58;
         assert_eq!(String::from(encoding), "base58".to_string());
+    }
+
+    #[test]
+    fn test_string_to_bytes32() {
+        let s = "xmtp/installation/base58";
+        let bytes: [u8; 32] = string_to_bytes32(s);
+        assert_eq!(
+            String::from_utf8_lossy(&bytes),
+            "xmtp/installation/base58        "
+        );
+
+        let s = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
+        let bytes: [u8; 32] = string_to_bytes32(s);
+        assert_eq!(
+            String::from_utf8_lossy(&bytes),
+            s.chars().take(32).collect::<String>()
+        );
+    }
+
+    #[test]
+    fn test_verification_method_properties_converts_to_bytes() {
+        let prop = VerificationMethodProperties::PublicKeyHex {
+            public_key_hex: "0000000000000000000000000000000000000000".to_string(),
+        };
+        let bytes: Vec<u8> = prop.try_into().unwrap();
+        assert_eq!(
+            bytes,
+            hex::decode("0000000000000000000000000000000000000000").unwrap()
+        );
+
+        let b64 = BASE64.encode("base64");
+        let prop = VerificationMethodProperties::PublicKeyBase64 {
+            public_key_base64: b64.clone(),
+        };
+        let bytes: Vec<u8> = prop.try_into().unwrap();
+        assert_eq!(bytes, BASE64.decode(b64).unwrap());
+
+        let b58 = bs58::encode("base58").into_string();
+        let prop = VerificationMethodProperties::PublicKeyBase58 {
+            public_key_base58: b58.clone(),
+        };
+        let bytes: Vec<u8> = prop.try_into().unwrap();
+        assert_eq!(bytes, bs58::decode(b58.clone()).into_vec().unwrap());
+
+        let prop = VerificationMethodProperties::BlockchainAccountId {
+            blockchain_account_id: "0000000000000000000000000000000000000000".to_string(),
+        };
+        let bytes: Vec<u8> = prop.try_into().unwrap();
+        assert_eq!(
+            bytes,
+            hex::decode("0000000000000000000000000000000000000000").unwrap()
+        );
     }
 }

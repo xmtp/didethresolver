@@ -282,6 +282,13 @@ impl DidUrl {
         self.path.as_deref()
     }
 
+    pub fn contains_query(&self, key: String, value: String) -> bool {
+        self.query
+            .as_ref()
+            .map(|q| q.contains(&(key, value)))
+            .unwrap_or(false)
+    }
+
     pub fn query(&self) -> Option<&[(String, String)]> {
         self.query.as_deref()
     }
@@ -716,5 +723,26 @@ mod tests {
         assert_eq!(Network::from("mainnet"), Network::Mainnet);
         assert_eq!(Network::from("sepolia"), Network::Sepolia);
         assert_eq!(Network::from("1a1"), Network::Other(0x1a1));
+    }
+
+    #[test]
+    fn test_contains_query() {
+        let did_url = DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=hi&username=&password=hunter2").unwrap();
+
+        assert!(did_url.contains_query("meta".into(), "hi".into()));
+        assert!(did_url.contains_query("username".into(), "".into()));
+        assert!(did_url.contains_query("password".into(), "hunter2".into()));
+        assert!(!did_url.contains_query("does".into(), "not exist".into()));
+
+        let did_url =
+            DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000").unwrap();
+        assert!(!did_url.contains_query("no".into(), "queries".into()));
+    }
+
+    #[test]
+    fn test_network_to_string() {
+        assert_eq!(Network::Mainnet.to_string(), "mainnet");
+        assert_eq!(Network::Sepolia.to_string(), "sepolia");
+        assert_eq!(Network::Other(0x1a1).to_string(), "417");
     }
 }

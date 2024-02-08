@@ -14,7 +14,7 @@
 //! *_NOTE:_* This format may be updated and changed according to the needs of the XMTP protocol. (currently
 //! in development)
 
-use super::{Attribute, EthrBuilder, KeyEncoding, KeyType, VerificationMethod};
+use super::{string_to_bytes32, Attribute, EthrBuilder, KeyEncoding, KeyType, VerificationMethod};
 use crate::error::EthrBuilderError;
 
 use std::fmt;
@@ -28,6 +28,12 @@ pub struct XmtpAttribute {
     pub purpose: XmtpKeyPurpose,
     /// the encoding of the key, e.g hex or base64
     pub encoding: KeyEncoding,
+}
+
+impl From<XmtpAttribute> for [u8; 32] {
+    fn from(attr: XmtpAttribute) -> Self {
+        string_to_bytes32(attr.to_string())
+    }
 }
 
 impl fmt::Display for XmtpAttribute {
@@ -89,6 +95,7 @@ impl EthrBuilder {
             verification_type: KeyType::Ed25519VerificationKey2020,
             verification_properties: Self::encode_attribute_value(value, key.encoding)?,
         };
+
         match key.purpose {
             XmtpKeyPurpose::Installation => {
                 self.authentication.push(method.id.clone());
@@ -190,5 +197,18 @@ mod test {
         let purpose = XmtpKeyPurpose::Installation;
         assert_eq!(purpose.to_string(), "installation");
         assert_eq!(String::from(purpose), "installation");
+    }
+
+    #[test]
+    fn test_xmtp_attribute_bytes() {
+        let attr = XmtpAttribute {
+            purpose: XmtpKeyPurpose::Installation,
+            encoding: KeyEncoding::Hex,
+        };
+
+        assert_eq!(
+            b"xmtp/installation/hex           ".as_slice(),
+            <[u8; 32]>::from(attr)
+        );
     }
 }

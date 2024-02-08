@@ -66,3 +66,19 @@ impl From<RpcError> for ErrorObjectOwned {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rpc_error_conversion() {
+        let gen_error = H160::from_str("0xerror").unwrap_err();
+        let rpc_error = RpcError::from(gen_error);
+
+        let error_object = ErrorObjectOwned::from(rpc_error);
+
+        assert_eq!(error_object.code(), -31999);
+        assert_eq!(error_object.message(), "Invalid public key format");
+    }
+}
