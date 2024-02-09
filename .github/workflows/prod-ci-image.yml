@@ -21,7 +21,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          file:    prod/Dockerfile
+          file: prod/Dockerfile
           platforms: linux/amd64
           push: false
           build-args: |
