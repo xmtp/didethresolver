@@ -83,6 +83,7 @@ pub async fn set_attr(app: &App) -> Result<(), Error> {
     let signer = SignerMiddleware::new_with_provider_chain(provider, wallet.clone()).await?;
     let registry = DIDRegistry::new(contract, Arc::new(signer));
 
+    // a public ed25519 SSH key -- good example since XMTP Installation keys are ed25519 as well.
     let dummy_key =
         BASE64.decode("AAAAC3NzaC1lZDI1NTE5AAAAILUArrr4oix6p/bSjeuXKi2crVzsuSqSYoz//YJMsTlo")?;
     let dummy_key = hex::encode(dummy_key);
