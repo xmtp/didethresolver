@@ -2,7 +2,8 @@
 members = [
   "lib",
   "resolver",
-  "examples/*",
+  "examples/*", "bin/test-tx",
+  "bin/test-tx"
 ]
 
 exclude = [ ]
