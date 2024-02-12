@@ -108,7 +108,7 @@ pub async fn set_attr(app: &App) -> Result<(), Error> {
             .context("Transaction was not included")?
             .ok_or(anyhow!("Not transaction receipt"))?;
         println!(
-            "Transaction has been included in block {}, at transaction hash {} using gas {}",
+            "Transaction has been included in block {}, at transaction hash {} using {} gas",
             result.block_number.unwrap_or(0.into()),
             hex::encode(result.transaction_hash),
             result.gas_used.unwrap_or(0.into())
