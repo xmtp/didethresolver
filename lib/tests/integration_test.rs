@@ -7,6 +7,7 @@ use ethers::{
     signers::{LocalWallet, Signer as _},
     types::{Address, U256},
 };
+use regex::Regex;
 use integration_util::{validate_document, with_client};
 
 #[cfg(test)]
@@ -333,15 +334,10 @@ mod it {
             did.send().await?.await?;
 
             let document = client.resolve_did(hex::encode(me), None).await?.document;
-            assert_eq!(
-                document.verification_method[1].id,
-                DidUrl::parse(format!(
-                    "did:ethr:0x{}?meta=installation#xmtp-0",
-                    hex::encode(me)
-                ))
-                .unwrap()
-            );
-
+            let regexr = format!(r"did:ethr:mainnet:0x{}\?meta=installation&timestamp=\d+#xmtp-0", hex::encode(me));
+            let test = Regex::new(&regexr).unwrap();
+            assert!(test.is_match(&document.verification_method[1].id.to_string()));
+            
             let did = registry.revoke_attribute(
                 me,
                 attribute_name,

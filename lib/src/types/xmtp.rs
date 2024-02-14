@@ -20,6 +20,7 @@ use crate::error::EthrBuilderError;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+use crate::resolver::EventContext;
 
 /// The XMTP Attribute Type
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -83,12 +84,17 @@ impl EthrBuilder {
         index: usize,
         value: V,
         key: XmtpAttribute,
+        context: &EventContext,
     ) -> Result<(), EthrBuilderError> {
         log::debug!("index: {}", index);
+
         let did_url = self
             .id
             .with_fragment(Some(&format!("xmtp-{}", index)))
-            .with_query("meta", Some(&key.purpose.to_string()));
+            .with_query("meta", Some(&key.purpose.to_string()))
+            .with_query("timestamp", Some(&context.timestamp.to_string()));
+
+
         let method = VerificationMethod {
             id: did_url,
             controller: self.id.clone(),
@@ -131,7 +137,7 @@ mod test {
         builder.now(U256::zero());
 
         for attr in attributes {
-            builder.attribute_event(attr).unwrap()
+            builder.attribute_event(attr, &EventContext::mock(10_000)).unwrap()
         }
 
         let doc = builder.build().unwrap();
@@ -139,7 +145,7 @@ mod test {
         assert_eq!(doc.verification_method[1].id.fragment().unwrap(), "xmtp-0");
         assert_eq!(
             doc.verification_method[1].id.query().unwrap(),
-            vec![("meta".to_string(), "installation".to_string())]
+            vec![("meta".to_string(), "installation".to_string()), ("timestamp".to_string(), "10000".to_string())]
         );
         assert_eq!(doc.verification_method.len(), 2);
 
@@ -160,7 +166,7 @@ mod test {
         builder.now(U256::from(100));
 
         for attr in attributes {
-            builder.attribute_event(attr).unwrap()
+            builder.attribute_event(attr, &EventContext::mock(10_000)).unwrap()
         }
 
         assert_eq!(builder.xmtp_count, 1);

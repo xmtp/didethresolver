@@ -90,3 +90,4 @@ pub use rpc::DidRegistryServer;
 
 #[cfg(feature = "client")]
 pub use rpc::DidRegistryClient;
+

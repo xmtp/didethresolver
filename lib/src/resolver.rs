@@ -28,6 +28,27 @@ impl<M> From<DIDRegistry<M>> for Resolver<M> {
     }
 }
 
+/// Extra context passed to the document builder from the [`Resolver`]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventContext {
+    /// the timestamp in nanoseconds in which the block from the document was built.
+    pub timestamp: i64
+}
+
+impl EventContext {
+    pub async fn new<M: Middleware>(meta: &LogMeta, signer: impl Middleware) -> Result<Self, ResolverError<M>> {
+        let block = signer.get_block(meta.block_number).await.map_err(|e| ResolverError::Middleware(e.to_string()))?;
+        let timestamp = block
+            .ok_or(ResolverError::MissingBlock(meta.block_number))?
+            .time()
+            .unwrap_or_default()
+            .timestamp_nanos_opt()
+            .ok_or(ResolverError::TimestampOutOfRange(meta.block_number))?;
+
+        Ok(Self { timestamp })
+    }
+}
+
 impl<M: Middleware + 'static> Resolver<M> {
     /// Instantiate a new did:ethr resolver
     pub async fn new(middleware: M, registry: Address) -> Result<Self, ResolverError<M>> {
@@ -90,21 +111,22 @@ impl<M: Middleware + 'static> Resolver<M> {
         Ok(history)
     }
 
-    fn dispatch_event(
+    async fn dispatch_event(
         &self,
         doc: &mut EthrBuilder,
         public_key: H160,
         event: DIDRegistryEvents,
         meta: LogMeta,
-    ) {
+    ) -> Result<(), ResolverError<M>> {
+        let context = EventContext::new(&meta, self.signer()).await?;
         let res = match event {
             DIDRegistryEvents::DiddelegateChangedFilter(delegate_changed) => {
                 log::trace!("Delegate Changed {:?}", delegate_changed);
-                doc.delegate_event(delegate_changed)
+                doc.delegate_event(delegate_changed, &context)
             }
             DIDRegistryEvents::DidattributeChangedFilter(attribute_event) => {
                 log::trace!("Attribute Changed {:?}", attribute_event);
-                doc.attribute_event(attribute_event)
+                doc.attribute_event(attribute_event, &context)
             }
             DIDRegistryEvents::DidownerChangedFilter(owner_changed) => {
                 log::trace!("Owner Changed {:?}", owner_changed);
@@ -123,6 +145,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                     public_key, meta.block_number, meta.log_index, e,
                 );
         };
+        Ok(())
     }
 
     async fn wrap_did_resolution(
@@ -157,7 +180,7 @@ impl<M: Middleware + 'static> Resolver<M> {
             if version_id.unwrap_or_default() > U64::zero() {
                 if meta.block_number <= version_id.unwrap_or_default() {
                     // 1. delegate events
-                    Resolver::dispatch_event(self, &mut base_document, public_key, event, meta);
+                    Resolver::dispatch_event(self, &mut base_document, public_key, event, meta).await?;
                     // 2. set latest version
                     if current_version_id < block_number {
                         current_version_id = block_number;
@@ -169,7 +192,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                 }
             } else {
                 // 1. delegate events
-                Resolver::dispatch_event(self, &mut base_document, public_key, event, meta);
+                Resolver::dispatch_event(self, &mut base_document, public_key, event, meta).await?;
                 // 2. set latest version
                 if current_version_id < block_number {
                     current_version_id = block_number;
