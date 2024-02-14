@@ -109,7 +109,7 @@ where
 
 async fn deploy_to_anvil(anvil: &AnvilInstance) -> Address {
     let wallet: LocalWallet = anvil.keys()[0].clone().into();
-    let client = client(&anvil, wallet).await;
+    let client = client(anvil, wallet).await;
 
     let registry = DIDRegistry::deploy(client.clone(), ())
         .unwrap()

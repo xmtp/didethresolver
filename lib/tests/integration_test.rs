@@ -82,9 +82,8 @@ mod it {
                     .to_string()
             })
         );
-        assert_eq!(
-            resolution_response.metadata.clone().deactivated,
-            false
+        assert!(
+            !resolution_response.metadata.clone().deactivated
         );
         assert_eq!(
             resolution_response.metadata.clone().version_id,
@@ -123,9 +122,8 @@ mod it {
         let resolution_response = client.resolve_did(hex::encode(me), Some::<String>("2".to_string())).await?;
         validate_document(&resolution_response.document).await;
 
-        assert_eq!(
-            resolution_response.metadata.clone().deactivated,
-            false
+        assert!(
+            !resolution_response.metadata.clone().deactivated
         );
         assert_eq!(
             resolution_response.metadata.clone().version_id,

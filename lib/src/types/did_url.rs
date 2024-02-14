@@ -302,14 +302,11 @@ impl DidUrl {
 
     /// get a query value based on its `key`
     pub fn get_query_value(&self, key: String) -> Option<String> {
-        self.query
-            .as_ref()
-            .map(|q| {
-                q.iter()
-                    .find(|(k, _)| k == &key)
-                    .map(|(_, v)| v.to_string())
-            })
-            .flatten()
+        self.query.as_ref().and_then(|q| {
+            q.iter()
+                .find(|(k, _)| k == &key)
+                .map(|(_, v)| v.to_string())
+        })
     }
 
     /// Immutable copy constructor to add a query parameter to the DID URL.
