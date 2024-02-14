@@ -17,16 +17,16 @@ use super::{
 use crate::{
     error::EthrBuilderError,
     resolver::{
-        did_registry::{DidattributeChangedFilter, DiddelegateChangedFilter, DidownerChangedFilter},
+        did_registry::{
+            DidattributeChangedFilter, DiddelegateChangedFilter, DidownerChangedFilter,
+        },
         EventContext,
     },
     types::{self, NULL_ADDRESS},
 };
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use ethers::{
-    types::{Address, Bytes, U256},
-};
+use ethers::types::{Address, Bytes, U256};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -172,7 +172,8 @@ impl EthrBuilder {
             return Ok(());
         }
 
-        self.keys.insert(key, (self.delegate_count, context.clone()));
+        self.keys
+            .insert(key, (self.delegate_count, context.clone()));
         self.delegate_count += 1;
 
         Ok(())
@@ -214,7 +215,8 @@ impl EthrBuilder {
         match attribute {
             Attribute::PublicKey(_) => {
                 if event.is_valid(&self.now) {
-                    self.keys.insert(key, (self.delegate_count, context.clone()));
+                    self.keys
+                        .insert(key, (self.delegate_count, context.clone()));
                 }
                 self.delegate_count += 1;
             }
@@ -419,7 +421,10 @@ impl EthrBuilder {
     }
 
     fn build_keys(&mut self) -> Result<(), EthrBuilderError> {
-        let mut keys = self.keys.drain().collect::<Vec<(Key, (usize, EventContext))>>();
+        let mut keys = self
+            .keys
+            .drain()
+            .collect::<Vec<(Key, (usize, EventContext))>>();
         keys.sort_by_key(|(_, (index, _))| *index);
 
         for (key, (index, context)) in keys {
@@ -433,9 +438,7 @@ impl EthrBuilder {
                     Attribute::Service(service) => {
                         self.service(index, value, service)?;
                     }
-                    Attribute::Xmtp(xmtp) => {
-                        self.xmtp_key(index, value, xmtp, &context)?
-                    }
+                    Attribute::Xmtp(xmtp) => self.xmtp_key(index, value, xmtp, &context)?,
                     Attribute::Other(_) => (),
                 },
                 Key::Delegate { delegate, purpose } => {
@@ -452,12 +455,10 @@ impl EthrBuilder {
 pub(crate) mod tests {
     use super::*;
     use crate::types::test::address;
-    
+
     impl EventContext {
         pub fn mock(timestamp: i64) -> Self {
-            Self {
-                timestamp
-            }
+            Self { timestamp }
         }
     }
 
@@ -520,7 +521,9 @@ pub(crate) mod tests {
         let mut builder = EthrBuilder::default();
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
-        builder.attribute_event(event, &EventContext::mock(0)).unwrap();
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
         let doc = builder.build().unwrap();
         assert_eq!(
             doc.verification_method[1],
@@ -549,7 +552,9 @@ pub(crate) mod tests {
         let mut builder = EthrBuilder::default();
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
-        builder.attribute_event(event, &EventContext::mock(0)).unwrap();
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
         let doc = builder.build().unwrap();
         assert_eq!(
             doc.verification_method[1],
@@ -579,7 +584,9 @@ pub(crate) mod tests {
         let mut builder = EthrBuilder::default();
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
-        builder.attribute_event(event, &EventContext::mock(0)).unwrap();
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
         let doc = builder.build().unwrap();
         assert_eq!(
             doc.service,
@@ -629,7 +636,9 @@ pub(crate) mod tests {
         builder.now(U256::zero());
 
         for event in events {
-            builder.attribute_event(event, &EventContext::mock(0)).unwrap();
+            builder
+                .attribute_event(event, &EventContext::mock(0))
+                .unwrap();
         }
 
         let doc = builder.build().unwrap();
@@ -684,7 +693,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::from(100));
         for event in events {
-            builder.attribute_event(event, &EventContext::mock(0)).unwrap();
+            builder
+                .attribute_event(event, &EventContext::mock(0))
+                .unwrap();
         }
         let doc = builder.build().unwrap();
 
@@ -743,7 +754,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         for event in events {
-            builder.delegate_event(event, &EventContext::mock(0)).unwrap();
+            builder
+                .delegate_event(event, &EventContext::mock(0))
+                .unwrap();
         }
         let doc = builder.build().unwrap();
 
@@ -819,7 +832,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         for event in &events {
-            builder.delegate_event(event.clone(), &EventContext::mock(0)).unwrap();
+            builder
+                .delegate_event(event.clone(), &EventContext::mock(0))
+                .unwrap();
         }
 
         // both events are valid
@@ -829,7 +844,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::from(75));
         for event in &events {
-            builder.delegate_event(event.clone(), &EventContext::mock(0)).unwrap();
+            builder
+                .delegate_event(event.clone(), &EventContext::mock(0))
+                .unwrap();
         }
         // only one event is valid
         assert_eq!(builder.keys.len(), 1);
@@ -838,7 +855,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::from(125));
         for event in &events {
-            builder.delegate_event(event.clone(), &EventContext::mock(0)).unwrap();
+            builder
+                .delegate_event(event.clone(), &EventContext::mock(0))
+                .unwrap();
         }
 
         // no events valid
@@ -880,12 +899,20 @@ pub(crate) mod tests {
         let mut builder = EthrBuilder::default();
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
-    
+
         let context = EventContext::mock(0);
-        builder.attribute_event(attributes[0].clone(), &context).unwrap();
-        builder.delegate_event(delegates[0].clone(), &context).unwrap();
-        builder.attribute_event(attributes[1].clone(), &context).unwrap();
-        builder.delegate_event(delegates[1].clone(), &context).unwrap();
+        builder
+            .attribute_event(attributes[0].clone(), &context)
+            .unwrap();
+        builder
+            .delegate_event(delegates[0].clone(), &context)
+            .unwrap();
+        builder
+            .attribute_event(attributes[1].clone(), &context)
+            .unwrap();
+        builder
+            .delegate_event(delegates[1].clone(), &context)
+            .unwrap();
 
         let doc = builder.build().unwrap();
 
@@ -958,7 +985,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
 
-        builder.attribute_event(event, &EventContext::mock(0)).unwrap();
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
 
         let doc = builder.build().unwrap();
 

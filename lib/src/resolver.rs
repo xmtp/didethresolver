@@ -32,12 +32,18 @@ impl<M> From<DIDRegistry<M>> for Resolver<M> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventContext {
     /// the timestamp in nanoseconds in which the block from the document was built.
-    pub timestamp: i64
+    pub timestamp: i64,
 }
 
 impl EventContext {
-    pub async fn new<M: Middleware>(meta: &LogMeta, signer: impl Middleware) -> Result<Self, ResolverError<M>> {
-        let block = signer.get_block(meta.block_number).await.map_err(|e| ResolverError::Middleware(e.to_string()))?;
+    pub async fn new<M: Middleware>(
+        meta: &LogMeta,
+        signer: impl Middleware,
+    ) -> Result<Self, ResolverError<M>> {
+        let block = signer
+            .get_block(meta.block_number)
+            .await
+            .map_err(|e| ResolverError::Middleware(e.to_string()))?;
         let timestamp = block
             .ok_or(ResolverError::MissingBlock(meta.block_number))?
             .time()
@@ -180,7 +186,8 @@ impl<M: Middleware + 'static> Resolver<M> {
             if version_id.unwrap_or_default() > U64::zero() {
                 if meta.block_number <= version_id.unwrap_or_default() {
                     // 1. delegate events
-                    Resolver::dispatch_event(self, &mut base_document, public_key, event, meta).await?;
+                    Resolver::dispatch_event(self, &mut base_document, public_key, event, meta)
+                        .await?;
                     // 2. set latest version
                     if current_version_id < block_number {
                         current_version_id = block_number;
@@ -246,6 +253,8 @@ impl<M: Middleware + 'static> Resolver<M> {
 
 #[cfg(test)]
 mod tests {
+    use ethers::{prelude::Provider, providers::MockProvider, types::TxHash};
+
     use super::*;
 
     #[test]
@@ -254,5 +263,24 @@ mod tests {
         let registry = DIDRegistry::new(Address::zero(), Arc::new(provider));
         let resolver = Resolver::from(registry);
         assert_eq!(resolver.registry.address(), Address::zero());
+    }
+
+    #[tokio::test]
+    async fn test_context_constructor() {
+        let (provider, mock) = Provider::mocked();
+        mock.push(Block::<TxHash>::default()).unwrap();
+
+        let meta = LogMeta {
+            address: Address::zero(),
+            block_hash: H256::zero(),
+            block_number: U64::zero(),
+            log_index: U256::zero(),
+            transaction_hash: H256::zero(),
+            transaction_index: U64::zero(),
+        };
+        let context = EventContext::new::<Provider<MockProvider>>(&meta, Arc::new(provider))
+            .await
+            .unwrap();
+        assert_eq!(context.timestamp, 0);
     }
 }

@@ -3,11 +3,10 @@ use ethers::{
     contract::ContractError,
     providers::{Middleware, ProviderError},
     signers::WalletError,
-    types::U64
+    types::U64,
 };
 use jsonrpsee::types::ErrorObjectOwned;
 use thiserror::Error;
-
 
 /// Errors originating from resolution with the [`Resolver`](crate::resolver::Resolver)
 #[derive(Error, Debug)]
@@ -18,7 +17,7 @@ pub enum ResolverError<M: Middleware> {
     ContractError(#[from] ContractError<M>),
     #[error("{0}")]
     Middleware(String),
-     #[error("Block {0} containing Registry event not found")]
+    #[error("Block {0} containing Registry event not found")]
     MissingBlock(U64),
     #[error("Block {0} timestamp out of range")]
     TimestampOutOfRange(U64),
