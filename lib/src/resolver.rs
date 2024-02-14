@@ -31,8 +31,8 @@ impl<M> From<DIDRegistry<M>> for Resolver<M> {
 /// Extra context passed to the document builder from the [`Resolver`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventContext {
-    /// the timestamp in nanoseconds in which the block from the document was built.
-    pub block_timestamp: i64,
+    /// the timestamp in seconds in which the block from the document was built.
+    pub block_timestamp: u64,
 }
 
 impl EventContext {
@@ -45,11 +45,10 @@ impl EventContext {
             .await
             .map_err(|e| ResolverError::Middleware(e.to_string()))?;
 
-        let block_timestamp = block
+        let block_timestamp: u64 = block
             .ok_or(ResolverError::MissingBlock(meta.block_number))?
-            .time()?
-            .timestamp_nanos_opt()
-            .ok_or(ResolverError::TimestampOutOfRange(meta.block_number))?;
+            .timestamp
+            .as_u64();
 
         Ok(Self { block_timestamp })
     }
@@ -281,6 +280,6 @@ mod tests {
         let context = EventContext::new::<Provider<MockProvider>>(&meta, Arc::new(provider))
             .await
             .unwrap();
-        assert_eq!(context.timestamp, 0);
+        assert_eq!(context.block_timestamp, 0);
     }
 }

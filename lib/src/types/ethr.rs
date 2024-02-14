@@ -457,8 +457,8 @@ pub(crate) mod tests {
     use crate::types::test::address;
 
     impl EventContext {
-        pub fn mock(timestamp: i64) -> Self {
-            Self { timestamp }
+        pub fn mock(block_timestamp: u64) -> Self {
+            Self { block_timestamp }
         }
     }
 

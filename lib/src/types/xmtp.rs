@@ -22,6 +22,8 @@ use std::fmt;
 use crate::resolver::EventContext;
 use serde::{Deserialize, Serialize};
 
+pub const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
+
 /// The XMTP Attribute Type
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct XmtpAttribute {
@@ -88,11 +90,13 @@ impl EthrBuilder {
     ) -> Result<(), EthrBuilderError> {
         log::debug!("index: {}", index);
 
+        let timestamp_ns = context.block_timestamp * NANOSECONDS_PER_SECOND;
+
         let did_url = self
             .id
             .with_fragment(Some(&format!("xmtp-{}", index)))
             .with_query("meta", Some(&key.purpose.to_string()))
-            .with_query("timestamp", Some(&context.timestamp.to_string()));
+            .with_query("timestamp", Some(&timestamp_ns.to_string()));
 
         let method = VerificationMethod {
             id: did_url,
@@ -148,7 +152,10 @@ mod test {
             doc.verification_method[1].id.query().unwrap(),
             vec![
                 ("meta".to_string(), "installation".to_string()),
-                ("timestamp".to_string(), "10000".to_string())
+                (
+                    "timestamp".to_string(),
+                    (10000 * NANOSECONDS_PER_SECOND).to_string()
+                )
             ]
         );
         assert_eq!(doc.verification_method.len(), 2);
