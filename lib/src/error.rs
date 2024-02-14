@@ -19,6 +19,8 @@ pub enum ResolverError<M: Middleware> {
     Middleware(String),
     #[error("Block {0} containing Registry event not found")]
     MissingBlock(U64),
+    #[error(transparent)]
+    Time(#[from] ethers::core::types::TimeError),
     #[error("Block {0} timestamp out of range")]
     TimestampOutOfRange(U64),
 }

@@ -32,7 +32,7 @@ impl<M> From<DIDRegistry<M>> for Resolver<M> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventContext {
     /// the timestamp in nanoseconds in which the block from the document was built.
-    pub timestamp: i64,
+    pub block_timestamp: i64,
 }
 
 impl EventContext {
@@ -44,14 +44,14 @@ impl EventContext {
             .get_block(meta.block_number)
             .await
             .map_err(|e| ResolverError::Middleware(e.to_string()))?;
-        let timestamp = block
+
+        let block_timestamp = block
             .ok_or(ResolverError::MissingBlock(meta.block_number))?
-            .time()
-            .unwrap_or_default()
+            .time()?
             .timestamp_nanos_opt()
             .ok_or(ResolverError::TimestampOutOfRange(meta.block_number))?;
 
-        Ok(Self { timestamp })
+        Ok(Self { block_timestamp })
     }
 }
 
