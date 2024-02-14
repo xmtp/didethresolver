@@ -321,7 +321,7 @@ impl EthrBuilder {
         value: V,
         encoding: KeyEncoding,
     ) -> Result<Option<VerificationMethodProperties>, EthrBuilderError> {
-        let enc = match encoding {
+        Ok(match encoding {
             KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
                 public_key_hex: hex::encode(value),
             }),
@@ -331,9 +331,7 @@ impl EthrBuilder {
             KeyEncoding::Base58 => Some(VerificationMethodProperties::PublicKeyBase58 {
                 public_key_base58: bs58::encode(value).into_string(),
             }),
-        };
-
-        Ok(enc)
+        })
     }
 
     /// Adds a delegate to the document
