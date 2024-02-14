@@ -321,8 +321,13 @@ impl EthrBuilder {
         value: V,
         encoding: KeyEncoding,
     ) -> Result<Option<VerificationMethodProperties>, EthrBuilderError> {
-        let value = hex::decode(value.as_ref())?;
-        Ok(match encoding {
+        log::debug!(
+            "decoding attribute value {:?} with encoding: {}",
+            value.as_ref(),
+            encoding
+        );
+
+        let enc = match encoding {
             KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
                 public_key_hex: hex::encode(value),
             }),
@@ -332,7 +337,9 @@ impl EthrBuilder {
             KeyEncoding::Base58 => Some(VerificationMethodProperties::PublicKeyBase58 {
                 public_key_base58: bs58::encode(value).into_string(),
             }),
-        })
+        };
+        log::debug!("Encoded {:?}", enc);
+        Ok(enc)
     }
 
     /// Adds a delegate to the document
@@ -483,7 +490,11 @@ pub(crate) mod tests {
 
         let event = DidattributeChangedFilter {
             name: *b"did/pub/Secp256k1/veriKey/hex   ",
-            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            value: hex::decode(
+                "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+            )
+            .unwrap()
+            .into(),
             ..base_attr_changed(identity, None)
         };
 
@@ -514,7 +525,9 @@ pub(crate) mod tests {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let event = DidattributeChangedFilter {
             name: *b"did/pub/Ed25519/veriKey/base58  ",
-            value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            value: hex::decode("b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71")
+                .unwrap()
+                .into(),
             ..base_attr_changed(identity, None)
         };
 
@@ -545,7 +558,7 @@ pub(crate) mod tests {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let event = DidattributeChangedFilter {
             name: *b"did/pub/X25519/enc/base64       ",
-            value: b"302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052".into(),
+            value: hex::decode("302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052").unwrap().into(),
             ..base_attr_changed(identity, None)
         };
 
@@ -606,17 +619,17 @@ pub(crate) mod tests {
         let events = vec![
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/veriKey/hex   ",
-                value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode("02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/sigAuth/base58",
-                value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode("b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/X25519/enc/base64       ",
-                value: b"302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052".into(),
+                value: hex::decode("302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
@@ -664,17 +677,17 @@ pub(crate) mod tests {
         let events = vec![
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/veriKey/hex   ",
-                value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode("02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/sigAuth/base58",
-                value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode("b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").unwrap().into(),
                 ..base_attr_changed(identity, Some(10))
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/X25519/enc/base64       ",
-                value: b"302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052".into(),
+                value: hex::decode("302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
@@ -870,12 +883,20 @@ pub(crate) mod tests {
         let attributes = vec![
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/veriKey/hex   ",
-                value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode(
+                    "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+                )
+                .unwrap()
+                .into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/sigAuth/base58",
-                value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode(
+                    "b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+                )
+                .unwrap()
+                .into(),
                 ..base_attr_changed(identity, None)
             },
         ];
@@ -977,7 +998,11 @@ pub(crate) mod tests {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let event = DidattributeChangedFilter {
             name: *b"test/random/attribute99999999   ",
-            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            value: hex::decode(
+                "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+            )
+            .unwrap()
+            .into(),
             ..base_attr_changed(identity, None)
         };
 
