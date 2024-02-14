@@ -301,10 +301,10 @@ impl DidUrl {
     }
 
     /// get a query value based on its `key`
-    pub fn get_query_value(&self, key: String) -> Option<String> {
+    pub fn get_query_value<S: AsRef<str>>(&self, key: S) -> Option<String> {
         self.query.as_ref().and_then(|q| {
             q.iter()
-                .find(|(k, _)| k == &key)
+                .find(|(k, _)| k == key.as_ref())
                 .map(|(_, v)| v.to_string())
         })
     }
@@ -759,12 +759,9 @@ mod tests {
     fn test_get_query_value() {
         let did_url = DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=hi&username=&password=hunter2").unwrap();
 
-        assert_eq!(did_url.get_query_value("meta".into()), Some("hi".into()));
-        assert_eq!(did_url.get_query_value("username".into()), Some("".into()));
-        assert_eq!(
-            did_url.get_query_value("password".into()),
-            Some("hunter2".into())
-        );
-        assert_eq!(did_url.get_query_value("does_not_exist".into()), None);
+        assert_eq!(did_url.get_query_value("meta"), Some("hi".into()));
+        assert_eq!(did_url.get_query_value("username"), Some("".into()));
+        assert_eq!(did_url.get_query_value("password"), Some("hunter2".into()));
+        assert_eq!(did_url.get_query_value("does_not_exist"), None);
     }
 }
