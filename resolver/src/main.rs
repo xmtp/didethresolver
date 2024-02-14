@@ -7,7 +7,7 @@
 //! ### Endpoint
 //!
 //! ```text
-//! POST /api/v1/resolveDid
+//! POST
 //! ```
 //!
 //! ### Request Format
@@ -74,6 +74,11 @@
 //! - All requests must be made over HTTPS.
 //! - Rate limiting is applied to prevent abuse.
 //!
+//! ### Example
+//!
+//! ```bash
+//! curl -H "Content-Type: application/json" -d '{"id":1, "jsonrpc":"2.0", "method":"did_resolveDid", "params": { "publicKey":"x"} }' http://localhost:8080
+//! ```
 //!
 //! ### Support
 //!

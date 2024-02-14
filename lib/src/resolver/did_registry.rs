@@ -1,4 +1,5 @@
 //! Generated ABI Functions, along with some extra to make it easier to interact with the registry.
+use std::ffi::CStr;
 
 use crate::error::RegistrySignerError;
 use ethers::{
@@ -56,6 +57,11 @@ impl DidattributeChangedFilter {
 
     /// Get the name of the attribute as a string. non-UTF8 bytes will be replaced with the unicode replacement character, �.
     pub fn name_string_lossy(&self) -> String {
+        let is_cstr = self.name.iter().rev().any(|&c| c == 0);
+        if is_cstr {
+            let cstr = CStr::from_bytes_until_nul(self.name.as_ref()).expect("Nul check succeeded");
+            return cstr.to_string_lossy().to_string();
+        }
         String::from_utf8_lossy(self.name.as_ref()).to_string()
     }
 

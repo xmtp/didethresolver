@@ -40,7 +40,7 @@ pub struct DidUrl {
     pub fragment: Option<String>,
 }
 
-/// The `did` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL. returned by [`parse_ethr_did`]
+/// The `did` part of a [did:ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) URL. returned by [`super::parse_ethr_did`]
 #[derive(Debug, Clone, PartialEq, Eq, SmartDefault)]
 pub struct Did {
     pub method: Method,
@@ -245,7 +245,7 @@ impl DidUrl {
     /// Retrieves the chainId for an DID:ETHR URL, as defined in the [did-ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md).
     ///
     /// # Returns
-    /// A enum [`ChainId`] indicating the chain this DID belongs to.
+    /// A enum [`Network`] indicating the chain this DID belongs to.
     ///
     /// # Examples
     /// ```
@@ -261,7 +261,7 @@ impl DidUrl {
     /// Retrieves the identity part from the DID URL, as defined in the [did-ethr spec](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)).
     ///
     /// # Returns
-    /// A Enum [`AddressOrHexKey`] which identifies the DID. This can be either an 20-byte [`Address`] or a 33-byte [`Vec<u8>`].
+    /// A Enum [`Account`] which identifies the DID. This can be either an 20-byte [`Address`] or a 33-byte [`Vec<u8>`].
     ///
     /// # Examples
     /// ```
