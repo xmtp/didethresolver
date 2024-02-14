@@ -34,8 +34,6 @@ impl<M: Middleware + 'static> DidRegistryServer for DidRegistryMethods<M> {
     ) -> Result<DidResolutionResult, ErrorObjectOwned> {
         log::debug!("did_resolveDid called");
 
-        log::trace!("Resolving for key {}", public_key);
-
         // parse the version_id
         let parsed_version_id = version_id.map(|str| U64::from(u64::from_str(&str).unwrap()));
 
@@ -45,10 +43,9 @@ impl<M: Middleware + 'static> DidRegistryServer for DidRegistryMethods<M> {
                 H160::from_str(&public_key).map_err(RpcError::from)?,
                 parsed_version_id,
             )
-            .await;
-        log::debug!("Resolution Result {:?}", resolution_result);
+            .await?;
 
-        Ok(resolution_result?)
+        Ok(resolution_result)
     }
 }
 

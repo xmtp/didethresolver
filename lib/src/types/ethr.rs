@@ -321,12 +321,6 @@ impl EthrBuilder {
         value: V,
         encoding: KeyEncoding,
     ) -> Result<Option<VerificationMethodProperties>, EthrBuilderError> {
-        log::debug!(
-            "decoding attribute value {:?} with encoding: {}",
-            value.as_ref(),
-            encoding
-        );
-
         let enc = match encoding {
             KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
                 public_key_hex: hex::encode(value),
@@ -338,7 +332,7 @@ impl EthrBuilder {
                 public_key_base58: bs58::encode(value).into_string(),
             }),
         };
-        log::debug!("Encoded {:?}", enc);
+
         Ok(enc)
     }
 

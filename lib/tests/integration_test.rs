@@ -7,7 +7,7 @@ use ethers::{
     signers::{LocalWallet, Signer as _},
     types::{Address, U256},
 };
-use integration_util::{set_attribute, revoke_attribute, validate_document, with_client};
+use integration_util::{revoke_attribute, set_attribute, validate_document, with_client};
 use regex::Regex;
 
 #[cfg(test)]
@@ -27,7 +27,7 @@ mod it {
         let me = signer.address();
         set_attribute(&registry, me, "did/pub/Secp256k1/veriKey/hex", "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71", 604_800).await?;
         set_attribute(&registry, me, "did/pub/Ed25519/veriKey/base64", "302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052", 604_800).await?;
-  
+
         let resolution_response = client.resolve_did(hex::encode(me), None).await?;
         validate_document(&resolution_response.document).await;
         assert_eq!(
@@ -198,9 +198,22 @@ mod it {
     pub async fn test_attribute_revocation() -> Result<()> {
         with_client(None, |client, registry, signer, _| async move {
             let me = signer.address();
-            
-            set_attribute(&registry, me, "did/pub/Secp256k1/veriKey/hex", "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71", 604_800).await?;
-            revoke_attribute(&registry, me, "did/pub/Secp256k1/veriKey/hex", "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").await?;
+
+            set_attribute(
+                &registry,
+                me,
+                "did/pub/Secp256k1/veriKey/hex",
+                "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+                604_800,
+            )
+            .await?;
+            revoke_attribute(
+                &registry,
+                me,
+                "did/pub/Secp256k1/veriKey/hex",
+                "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+            )
+            .await?;
 
             let document = client.resolve_did(hex::encode(me), None).await?.document;
             validate_document(&document).await;
@@ -285,7 +298,14 @@ mod it {
         with_client(None, |client, registry, signer, _| async move {
             let me = signer.address();
             let attribute_name = "xmtp/installation/hex           ";
-            set_attribute(&registry, me, attribute_name, "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71", 604_800).await?;
+            set_attribute(
+                &registry,
+                me,
+                attribute_name,
+                "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+                604_800,
+            )
+            .await?;
 
             let document = client.resolve_did(hex::encode(me), None).await?.document;
             let regexr = format!(
@@ -294,9 +314,15 @@ mod it {
             );
             let test = Regex::new(&regexr).unwrap();
             assert!(test.is_match(&document.verification_method[1].id.to_string()));
-            
-            revoke_attribute(&registry, me, attribute_name, "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").await?;
-            
+
+            revoke_attribute(
+                &registry,
+                me,
+                attribute_name,
+                "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+            )
+            .await?;
+
             let document = client.resolve_did(hex::encode(me), None).await?.document;
             validate_document(&document).await;
             assert_eq!(
