@@ -1,6 +1,6 @@
 [package]
 name = "resolver"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["XMTP Labs <eng@xmtp.com>"]
 description = "Standalone did:ethr Resolution JSON-RPC Gateway"
 homepage = "https://github.com/xmtp/didethresolver"

@@ -11,7 +11,7 @@ pub trait DidRegistry {
     #[method(name = "resolveDid")]
     async fn resolve_did(
         &self,
-        public_key: String,
+        address: String,
         version_id: Option<String>,
     ) -> Result<DidResolutionResult, ErrorObjectOwned>;
 }
@@ -23,7 +23,7 @@ pub trait DidRegistry {
     #[method(name = "resolveDid")]
     async fn resolve_did(
         &self,
-        public_key: String,
+        address: String,
         version_id: Option<String>,
     ) -> Result<DidResolutionResult, ErrorObjectOwned>;
 }

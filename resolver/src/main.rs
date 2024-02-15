@@ -12,14 +12,14 @@
 //!
 //! ### Request Format
 //!
-//! The request should be a JSON object containing one field: `publicKey`.
+//! The request should be a JSON object containing one field: `address`.
 //!
-//! - `publicKey` (string, required): The Ethereum public key (starting with '0x').
+//! - `address` (string, required): The Ethereum address (starting with '0x').
 //!
 //! Example Request:
 //! ```json
 //! {
-//!   "publicKey": "0x123abc..."
+//!   "address": "0x123abc..."
 //! }
 //! ```
 //!
@@ -61,7 +61,7 @@
 //! Example Error Response:
 //! ```json
 //! {
-//!   "error": "Invalid public key format"
+//!   "error": "Invalid address format"
 //! }
 //! ```
 //!

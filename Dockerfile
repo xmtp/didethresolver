@@ -15,6 +15,8 @@ COPY --from=ghcr.io/xmtp/foundry:latest /usr/local/bin/anvil /usr/local/bin/anvi
 
 COPY --chown=xmtp:xmtp . .
 
+RUN yamlfmt -lint .github/workflows/*.yml
+
 ENV CARGO_INCREMENTAL=${CARGO_INCREMENTAL:-1}
 RUN cargo check --all-features
 RUN cargo fmt --check --all
