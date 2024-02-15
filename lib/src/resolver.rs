@@ -39,27 +39,20 @@ impl<M: Middleware + 'static> Resolver<M> {
     /// Resolve a did:ethr identifier
     pub async fn resolve_did(
         &self,
-        public_key: H160,
+        address: H160,
         version_id: Option<U64>,
     ) -> Result<DidResolutionResult, ResolverError<M>> {
-        let history = self.changelog(public_key).await?;
-        self.wrap_did_resolution(public_key, version_id, history)
-            .await
+        let history = self.changelog(address).await?;
+        self.wrap_did_resolution(address, version_id, history).await
     }
 
     async fn changelog(
         &self,
-        public_key: H160,
+        address: H160,
     ) -> Result<Vec<(DIDRegistryEvents, LogMeta)>, ResolverError<M>> {
-        let mut previous_change: U64 = self
-            .registry
-            .changed(public_key)
-            .call()
-            .await?
-            .as_u64()
-            .into();
+        let mut previous_change: U64 = self.registry.changed(address).call().await?.as_u64().into();
 
-        log::trace!("Previous Change for {}: {:?}", public_key, previous_change);
+        log::trace!("Previous Change for {}: {:?}", address, previous_change);
 
         let mut history = Vec::new();
 
@@ -73,7 +66,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                 .events()
                 .from_block(previous_change)
                 .to_block(previous_change)
-                .topic1(H256::from(public_key))
+                .topic1(H256::from(address))
                 .query_with_meta()
                 .await?;
 
@@ -93,7 +86,7 @@ impl<M: Middleware + 'static> Resolver<M> {
     fn dispatch_event(
         &self,
         doc: &mut EthrBuilder,
-        public_key: H160,
+        address: H160,
         event: DIDRegistryEvents,
         meta: LogMeta,
     ) {
@@ -120,19 +113,19 @@ impl<M: Middleware + 'static> Resolver<M> {
         if let Err(e) = res {
             log::error!(
                     "Error while resolving for {} at event block={}, log index={}, incorrect format?: {}",
-                    public_key, meta.block_number, meta.log_index, e,
+                    address, meta.block_number, meta.log_index, e,
                 );
         };
     }
 
     async fn wrap_did_resolution(
         &self,
-        public_key: H160,
+        address: H160,
         version_id: Option<U64>,
         history: Vec<(DIDRegistryEvents, LogMeta)>,
     ) -> Result<DidResolutionResult, ResolverError<M>> {
         let mut base_document = DidDocument::ethr_builder();
-        base_document.account_address(&public_key)?;
+        base_document.account_address(&address)?;
 
         let current_block = self
             .signer()
@@ -157,7 +150,7 @@ impl<M: Middleware + 'static> Resolver<M> {
             if version_id.unwrap_or_default() > U64::zero() {
                 if meta.block_number <= version_id.unwrap_or_default() {
                     // 1. delegate events
-                    Resolver::dispatch_event(self, &mut base_document, public_key, event, meta);
+                    Resolver::dispatch_event(self, &mut base_document, address, event, meta);
                     // 2. set latest version
                     if current_version_id < block_number {
                         current_version_id = block_number;
@@ -169,7 +162,7 @@ impl<M: Middleware + 'static> Resolver<M> {
                 }
             } else {
                 // 1. delegate events
-                Resolver::dispatch_event(self, &mut base_document, public_key, event, meta);
+                Resolver::dispatch_event(self, &mut base_document, address, event, meta);
                 // 2. set latest version
                 if current_version_id < block_number {
                     current_version_id = block_number;

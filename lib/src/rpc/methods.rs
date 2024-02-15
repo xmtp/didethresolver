@@ -29,7 +29,7 @@ impl<M: Middleware> DidRegistryMethods<M> {
 impl<M: Middleware + 'static> DidRegistryServer for DidRegistryMethods<M> {
     async fn resolve_did(
         &self,
-        public_key: String,
+        address: String,
         version_id: Option<String>,
     ) -> Result<DidResolutionResult, ErrorObjectOwned> {
         log::debug!("did_resolveDid called");
@@ -40,7 +40,7 @@ impl<M: Middleware + 'static> DidRegistryServer for DidRegistryMethods<M> {
         let resolution_result = self
             .resolver
             .resolve_did(
-                H160::from_str(&public_key).map_err(RpcError::from)?,
+                H160::from_str(&address).map_err(RpcError::from)?,
                 parsed_version_id,
             )
             .await?;
