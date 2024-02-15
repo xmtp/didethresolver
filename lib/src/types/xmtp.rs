@@ -17,12 +17,10 @@
 use super::{string_to_bytes32, Attribute, EthrBuilder, KeyEncoding, KeyType, VerificationMethod};
 use crate::error::EthrBuilderError;
 
-use std::fmt;
+use std::{fmt, time::Duration};
 
 use crate::resolver::EventContext;
 use serde::{Deserialize, Serialize};
-
-pub const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
 
 /// The XMTP Attribute Type
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -90,7 +88,7 @@ impl EthrBuilder {
     ) -> Result<(), EthrBuilderError> {
         log::debug!("index: {}", index);
 
-        let timestamp_ns = context.block_timestamp * NANOSECONDS_PER_SECOND;
+        let timestamp_ns = Duration::from_secs(context.block_timestamp).as_nanos();
 
         let did_url = self
             .id
@@ -154,7 +152,7 @@ mod test {
                 ("meta".to_string(), "installation".to_string()),
                 (
                     "timestamp".to_string(),
-                    (10000 * NANOSECONDS_PER_SECOND).to_string()
+                    Duration::from_secs(10000).as_nanos().to_string()
                 )
             ]
         );
