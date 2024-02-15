@@ -16,8 +16,11 @@ use super::{
 };
 use crate::{
     error::EthrBuilderError,
-    resolver::did_registry::{
-        DidattributeChangedFilter, DiddelegateChangedFilter, DidownerChangedFilter,
+    resolver::{
+        did_registry::{
+            DidattributeChangedFilter, DiddelegateChangedFilter, DidownerChangedFilter,
+        },
+        EventContext,
     },
     types::{self, NULL_ADDRESS},
 };
@@ -78,7 +81,7 @@ pub struct EthrBuilder {
     /// Map of keys to their index in the document
     /// _*NOTE*_: this is used to ensure the order of keys is maintained, but indexes of the same
     /// number are expected. (EX: a delegate and service both with index 0)
-    pub(super) keys: HashMap<Key, usize>,
+    pub(super) keys: HashMap<Key, (usize, EventContext)>,
 }
 
 impl Default for EthrBuilder {
@@ -139,6 +142,7 @@ impl EthrBuilder {
         Ok(())
     }
 
+    /// check whether the document has been deactivated
     pub fn is_deactivated(&mut self) -> bool {
         self.is_deactivated
     }
@@ -152,6 +156,7 @@ impl EthrBuilder {
     pub fn delegate_event(
         &mut self,
         event: DiddelegateChangedFilter,
+        context: &EventContext,
     ) -> Result<(), EthrBuilderError> {
         let delegate_type = String::from_utf8_lossy(&event.delegate_type);
         let key_purpose = types::parse_delegate(&delegate_type)?;
@@ -167,7 +172,8 @@ impl EthrBuilder {
             return Ok(());
         }
 
-        self.keys.insert(key, self.delegate_count);
+        self.keys
+            .insert(key, (self.delegate_count, context.clone()));
         self.delegate_count += 1;
 
         Ok(())
@@ -180,6 +186,7 @@ impl EthrBuilder {
     pub fn attribute_event(
         &mut self,
         event: DidattributeChangedFilter,
+        context: &EventContext,
     ) -> Result<(), EthrBuilderError> {
         let name = event.name_string_lossy();
         let attribute = types::parse_attribute(&name).unwrap_or(Attribute::Other(name.to_string()));
@@ -208,19 +215,20 @@ impl EthrBuilder {
         match attribute {
             Attribute::PublicKey(_) => {
                 if event.is_valid(&self.now) {
-                    self.keys.insert(key, self.delegate_count);
+                    self.keys
+                        .insert(key, (self.delegate_count, context.clone()));
                 }
                 self.delegate_count += 1;
             }
             Attribute::Service(_) => {
                 if event.is_valid(&self.now) {
-                    self.keys.insert(key, self.service_count);
+                    self.keys.insert(key, (self.service_count, context.clone()));
                 }
                 self.service_count += 1;
             }
             Attribute::Xmtp(_) => {
                 if event.is_valid(&self.now) {
-                    self.keys.insert(key, self.xmtp_count);
+                    self.keys.insert(key, (self.xmtp_count, context.clone()));
                 }
                 self.xmtp_count += 1;
             }
@@ -313,8 +321,13 @@ impl EthrBuilder {
         value: V,
         encoding: KeyEncoding,
     ) -> Result<Option<VerificationMethodProperties>, EthrBuilderError> {
-        let value = hex::decode(value.as_ref())?;
-        Ok(match encoding {
+        log::debug!(
+            "decoding attribute value {:?} with encoding: {}",
+            value.as_ref(),
+            encoding
+        );
+
+        let enc = match encoding {
             KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
                 public_key_hex: hex::encode(value),
             }),
@@ -324,7 +337,9 @@ impl EthrBuilder {
             KeyEncoding::Base58 => Some(VerificationMethodProperties::PublicKeyBase58 {
                 public_key_base58: bs58::encode(value).into_string(),
             }),
-        })
+        };
+        log::debug!("Encoded {:?}", enc);
+        Ok(enc)
     }
 
     /// Adds a delegate to the document
@@ -413,10 +428,13 @@ impl EthrBuilder {
     }
 
     fn build_keys(&mut self) -> Result<(), EthrBuilderError> {
-        let mut keys = self.keys.drain().collect::<Vec<(Key, usize)>>();
-        keys.sort_by_key(|k| k.1);
+        let mut keys = self
+            .keys
+            .drain()
+            .collect::<Vec<(Key, (usize, EventContext))>>();
+        keys.sort_by_key(|(_, (index, _))| *index);
 
-        for (key, index) in keys {
+        for (key, (index, context)) in keys {
             match key {
                 Key::Attribute {
                     value, attribute, ..
@@ -427,7 +445,7 @@ impl EthrBuilder {
                     Attribute::Service(service) => {
                         self.service(index, value, service)?;
                     }
-                    Attribute::Xmtp(xmtp) => self.xmtp_key(index, value, xmtp)?,
+                    Attribute::Xmtp(xmtp) => self.xmtp_key(index, value, xmtp, &context)?,
                     Attribute::Other(_) => (),
                 },
                 Key::Delegate { delegate, purpose } => {
@@ -444,6 +462,12 @@ impl EthrBuilder {
 pub(crate) mod tests {
     use super::*;
     use crate::types::test::address;
+
+    impl EventContext {
+        pub fn mock(block_timestamp: u64) -> Self {
+            Self { block_timestamp }
+        }
+    }
 
     //TODO: dids are case-sensitive w.r.t their addresses. One did should equal the other, no
     //matter the case of the address (other than blockchain_account_id b/c of EIP55)
@@ -466,14 +490,19 @@ pub(crate) mod tests {
 
         let event = DidattributeChangedFilter {
             name: *b"did/pub/Secp256k1/veriKey/hex   ",
-            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            value: hex::decode(
+                "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+            )
+            .unwrap()
+            .into(),
             ..base_attr_changed(identity, None)
         };
 
         let mut builder = EthrBuilder::default();
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
-        builder.attribute_event(event).unwrap();
+        let context = EventContext::mock(0);
+        builder.attribute_event(event, &context).unwrap();
         let doc = builder.build().unwrap();
         assert_eq!(
             doc.verification_method[1],
@@ -496,14 +525,18 @@ pub(crate) mod tests {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let event = DidattributeChangedFilter {
             name: *b"did/pub/Ed25519/veriKey/base58  ",
-            value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            value: hex::decode("b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71")
+                .unwrap()
+                .into(),
             ..base_attr_changed(identity, None)
         };
 
         let mut builder = EthrBuilder::default();
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
-        builder.attribute_event(event).unwrap();
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
         let doc = builder.build().unwrap();
         assert_eq!(
             doc.verification_method[1],
@@ -525,14 +558,16 @@ pub(crate) mod tests {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let event = DidattributeChangedFilter {
             name: *b"did/pub/X25519/enc/base64       ",
-            value: b"302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052".into(),
+            value: hex::decode("302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052").unwrap().into(),
             ..base_attr_changed(identity, None)
         };
 
         let mut builder = EthrBuilder::default();
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
-        builder.attribute_event(event).unwrap();
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
         let doc = builder.build().unwrap();
         assert_eq!(
             doc.verification_method[1],
@@ -562,7 +597,9 @@ pub(crate) mod tests {
         let mut builder = EthrBuilder::default();
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
-        builder.attribute_event(event).unwrap();
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
         let doc = builder.build().unwrap();
         assert_eq!(
             doc.service,
@@ -582,17 +619,17 @@ pub(crate) mod tests {
         let events = vec![
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/veriKey/hex   ",
-                value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode("02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/sigAuth/base58",
-                value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode("b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/X25519/enc/base64       ",
-                value: b"302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052".into(),
+                value: hex::decode("302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
@@ -612,7 +649,9 @@ pub(crate) mod tests {
         builder.now(U256::zero());
 
         for event in events {
-            builder.attribute_event(event).unwrap();
+            builder
+                .attribute_event(event, &EventContext::mock(0))
+                .unwrap();
         }
 
         let doc = builder.build().unwrap();
@@ -638,17 +677,17 @@ pub(crate) mod tests {
         let events = vec![
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/veriKey/hex   ",
-                value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode("02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/sigAuth/base58",
-                value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode("b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71").unwrap().into(),
                 ..base_attr_changed(identity, Some(10))
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/X25519/enc/base64       ",
-                value: b"302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052".into(),
+                value: hex::decode("302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052").unwrap().into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
@@ -667,7 +706,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::from(100));
         for event in events {
-            builder.attribute_event(event).unwrap();
+            builder
+                .attribute_event(event, &EventContext::mock(0))
+                .unwrap();
         }
         let doc = builder.build().unwrap();
 
@@ -726,7 +767,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         for event in events {
-            builder.delegate_event(event).unwrap();
+            builder
+                .delegate_event(event, &EventContext::mock(0))
+                .unwrap();
         }
         let doc = builder.build().unwrap();
 
@@ -802,7 +845,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
         for event in &events {
-            builder.delegate_event(event.clone()).unwrap();
+            builder
+                .delegate_event(event.clone(), &EventContext::mock(0))
+                .unwrap();
         }
 
         // both events are valid
@@ -812,7 +857,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::from(75));
         for event in &events {
-            builder.delegate_event(event.clone()).unwrap();
+            builder
+                .delegate_event(event.clone(), &EventContext::mock(0))
+                .unwrap();
         }
         // only one event is valid
         assert_eq!(builder.keys.len(), 1);
@@ -821,7 +868,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::from(125));
         for event in &events {
-            builder.delegate_event(event.clone()).unwrap();
+            builder
+                .delegate_event(event.clone(), &EventContext::mock(0))
+                .unwrap();
         }
 
         // no events valid
@@ -834,12 +883,20 @@ pub(crate) mod tests {
         let attributes = vec![
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/veriKey/hex   ",
-                value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode(
+                    "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+                )
+                .unwrap()
+                .into(),
                 ..base_attr_changed(identity, None)
             },
             DidattributeChangedFilter {
                 name: *b"did/pub/Secp256k1/sigAuth/base58",
-                value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+                value: hex::decode(
+                    "b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+                )
+                .unwrap()
+                .into(),
                 ..base_attr_changed(identity, None)
             },
         ];
@@ -864,10 +921,19 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
 
-        builder.attribute_event(attributes[0].clone()).unwrap();
-        builder.delegate_event(delegates[0].clone()).unwrap();
-        builder.attribute_event(attributes[1].clone()).unwrap();
-        builder.delegate_event(delegates[1].clone()).unwrap();
+        let context = EventContext::mock(0);
+        builder
+            .attribute_event(attributes[0].clone(), &context)
+            .unwrap();
+        builder
+            .delegate_event(delegates[0].clone(), &context)
+            .unwrap();
+        builder
+            .attribute_event(attributes[1].clone(), &context)
+            .unwrap();
+        builder
+            .delegate_event(delegates[1].clone(), &context)
+            .unwrap();
 
         let doc = builder.build().unwrap();
 
@@ -932,7 +998,11 @@ pub(crate) mod tests {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let event = DidattributeChangedFilter {
             name: *b"test/random/attribute99999999   ",
-            value: b"02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            value: hex::decode(
+                "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71",
+            )
+            .unwrap()
+            .into(),
             ..base_attr_changed(identity, None)
         };
 
@@ -940,7 +1010,9 @@ pub(crate) mod tests {
         builder.account_address(&identity).unwrap();
         builder.now(U256::zero());
 
-        builder.attribute_event(event).unwrap();
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
 
         let doc = builder.build().unwrap();
 

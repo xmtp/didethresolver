@@ -53,12 +53,12 @@ mod tests {
     #[test]
     fn test_parse_host_arg() -> anyhow::Result<()> {
         let env = setup();
-        let args = Args::parse_from(&["didethresolver", "-s", "host.xyz"]);
+        let args = Args::parse_from(["didethresolver", "-s", "host.xyz"]);
         assert_eq!(args.host, "host.xyz");
         assert_eq!(args.port, DEFAULT_PORT);
         assert_eq!(args.rpc_url, DEFAULT_RPC_URL);
         assert_eq!(args.did_registry, DID_ETH_REGISTRY);
-        let args2 = Args::parse_from(&["didethresolver", "--host", "h.xyz"]);
+        let args2 = Args::parse_from(["didethresolver", "--host", "h.xyz"]);
         assert_eq!(args2.host, "h.xyz");
         putback(env)
     }
@@ -66,12 +66,12 @@ mod tests {
     #[test]
     fn test_parse_port_arg() -> anyhow::Result<()> {
         let env = setup();
-        let args = Args::parse_from(&["didethresolver", "-p", "1234"]);
+        let args = Args::parse_from(["didethresolver", "-p", "1234"]);
         assert_eq!(args.host, DEFAULT_HOST);
         assert_eq!(args.port, 1234);
         assert_eq!(args.rpc_url, DEFAULT_RPC_URL);
         assert_eq!(args.did_registry, DID_ETH_REGISTRY);
-        let args2 = Args::parse_from(&["didethresolver", "--port", "4321"]);
+        let args2 = Args::parse_from(["didethresolver", "--port", "4321"]);
         assert_eq!(args2.host, DEFAULT_HOST);
         assert_eq!(args2.port, 4321);
         putback(env)
@@ -80,12 +80,12 @@ mod tests {
     #[test]
     fn test_parse_rpc_url_arg() -> anyhow::Result<()> {
         let env = setup();
-        let args = Args::parse_from(&["didethresolver", "-r", "http://rpc.xyz"]);
+        let args = Args::parse_from(["didethresolver", "-r", "http://rpc.xyz"]);
         assert_eq!(args.host, DEFAULT_HOST);
         assert_eq!(args.port, DEFAULT_PORT);
         assert_eq!(args.rpc_url, "http://rpc.xyz");
         assert_eq!(args.did_registry, DID_ETH_REGISTRY);
-        let args2 = Args::parse_from(&["didethresolver", "--rpc-url", "http://rpc2.xyz"]);
+        let args2 = Args::parse_from(["didethresolver", "--rpc-url", "http://rpc2.xyz"]);
         assert_eq!(args2.host, DEFAULT_HOST);
         assert_eq!(args2.port, DEFAULT_PORT);
         assert_eq!(args2.rpc_url, "http://rpc2.xyz");
@@ -95,12 +95,12 @@ mod tests {
     #[test]
     fn test_parse_did_registry_arg() -> anyhow::Result<()> {
         let env = setup();
-        let args = Args::parse_from(&["didethresolver", "-d", "0x1234567890"]);
+        let args = Args::parse_from(["didethresolver", "-d", "0x1234567890"]);
         assert_eq!(args.host, DEFAULT_HOST);
         assert_eq!(args.port, DEFAULT_PORT);
         assert_eq!(args.rpc_url, DEFAULT_RPC_URL);
         assert_eq!(args.did_registry, "0x1234567890");
-        let args2 = Args::parse_from(&[
+        let args2 = Args::parse_from([
             "didethresolver",
             "--did-registry",
             "0x0987654321",

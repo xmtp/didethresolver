@@ -17,8 +17,9 @@
 use super::{string_to_bytes32, Attribute, EthrBuilder, KeyEncoding, KeyType, VerificationMethod};
 use crate::error::EthrBuilderError;
 
-use std::fmt;
+use std::{fmt, time::Duration};
 
+use crate::resolver::EventContext;
 use serde::{Deserialize, Serialize};
 
 /// The XMTP Attribute Type
@@ -83,12 +84,18 @@ impl EthrBuilder {
         index: usize,
         value: V,
         key: XmtpAttribute,
+        context: &EventContext,
     ) -> Result<(), EthrBuilderError> {
         log::debug!("index: {}", index);
+
+        let timestamp_ns = Duration::from_secs(context.block_timestamp).as_nanos();
+
         let did_url = self
             .id
             .with_fragment(Some(&format!("xmtp-{}", index)))
-            .with_query("meta", Some(&key.purpose.to_string()));
+            .with_query("meta", Some(&key.purpose.to_string()))
+            .with_query("timestamp", Some(&timestamp_ns.to_string()));
+
         let method = VerificationMethod {
             id: did_url,
             controller: self.id.clone(),
@@ -131,7 +138,9 @@ mod test {
         builder.now(U256::zero());
 
         for attr in attributes {
-            builder.attribute_event(attr).unwrap()
+            builder
+                .attribute_event(attr, &EventContext::mock(10_000))
+                .unwrap()
         }
 
         let doc = builder.build().unwrap();
@@ -139,7 +148,13 @@ mod test {
         assert_eq!(doc.verification_method[1].id.fragment().unwrap(), "xmtp-0");
         assert_eq!(
             doc.verification_method[1].id.query().unwrap(),
-            vec![("meta".to_string(), "installation".to_string())]
+            vec![
+                ("meta".to_string(), "installation".to_string()),
+                (
+                    "timestamp".to_string(),
+                    Duration::from_secs(10000).as_nanos().to_string()
+                )
+            ]
         );
         assert_eq!(doc.verification_method.len(), 2);
 
@@ -160,7 +175,9 @@ mod test {
         builder.now(U256::from(100));
 
         for attr in attributes {
-            builder.attribute_event(attr).unwrap()
+            builder
+                .attribute_event(attr, &EventContext::mock(10_000))
+                .unwrap()
         }
 
         assert_eq!(builder.xmtp_count, 1);

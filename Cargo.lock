@@ -2580,6 +2580,7 @@ dependencies = [
  "peg",
  "percent-encoding",
  "rand 0.8.5",
+ "regex",
  "rustc-hex",
  "serde",
  "serde_json",

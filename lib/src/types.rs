@@ -272,7 +272,7 @@ impl From<Attribute> for [u8; 32] {
 
 // internal function to fill a [u8; 32] with bytes.
 // anything over 32 bytes will be cutoff.
-fn string_to_bytes32<S: AsRef<str>>(s: S) -> [u8; 32] {
+pub fn string_to_bytes32<S: AsRef<str>>(s: S) -> [u8; 32] {
     let s = s.as_ref();
     let mut attr_bytes: [u8; 32] = [b' '; 32];
     let length = std::cmp::min(s.as_bytes().len(), 32);

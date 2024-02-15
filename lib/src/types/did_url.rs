@@ -300,6 +300,15 @@ impl DidUrl {
         minion
     }
 
+    /// get a query value based on its `key`
+    pub fn get_query_value<S: AsRef<str>>(&self, key: S) -> Option<String> {
+        self.query.as_ref().and_then(|q| {
+            q.iter()
+                .find(|(k, _)| k == key.as_ref())
+                .map(|(_, v)| v.to_string())
+        })
+    }
+
     /// Immutable copy constructor to add a query parameter to the DID URL.
     /// # Examples
     /// ```rust
@@ -744,5 +753,15 @@ mod tests {
         assert_eq!(Network::Mainnet.to_string(), "mainnet");
         assert_eq!(Network::Sepolia.to_string(), "sepolia");
         assert_eq!(Network::Other(0x1a1).to_string(), "417");
+    }
+
+    #[test]
+    fn test_get_query_value() {
+        let did_url = DidUrl::parse("did:ethr:mainnet:0x0000000000000000000000000000000000000000?meta=hi&username=&password=hunter2").unwrap();
+
+        assert_eq!(did_url.get_query_value("meta"), Some("hi".into()));
+        assert_eq!(did_url.get_query_value("username"), Some("".into()));
+        assert_eq!(did_url.get_query_value("password"), Some("hunter2".into()));
+        assert_eq!(did_url.get_query_value("does_not_exist"), None);
     }
 }

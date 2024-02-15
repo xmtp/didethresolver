@@ -3,6 +3,7 @@ use ethers::{
     contract::ContractError,
     providers::{Middleware, ProviderError},
     signers::WalletError,
+    types::U64,
 };
 use jsonrpsee::types::ErrorObjectOwned;
 use thiserror::Error;
@@ -16,6 +17,12 @@ pub enum ResolverError<M: Middleware> {
     ContractError(#[from] ContractError<M>),
     #[error("{0}")]
     Middleware(String),
+    #[error("Block {0} containing Registry event not found")]
+    MissingBlock(U64),
+    #[error(transparent)]
+    Time(#[from] ethers::core::types::TimeError),
+    #[error("Block {0} timestamp out of range")]
+    TimestampOutOfRange(U64),
 }
 
 /// Errors originating from the parsing of a did url identifier, [`Did`](crate::types::DidUrl)

@@ -1,5 +1,7 @@
 //! Shared setup code for integration tests
 use ethers::providers::Middleware;
+use ethers::types::{Bytes, H160};
+use hex::FromHex;
 use std::sync::{Arc, Once};
 use std::{future::Future, time::Duration};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
@@ -11,7 +13,7 @@ use ethers::{
     middleware::SignerMiddleware,
     providers::{Provider, Ws},
     signers::{LocalWallet, Signer as _},
-    types::Address,
+    types::{Address, U256},
 };
 use futures::future::FutureExt;
 use jsonrpsee::{
@@ -19,8 +21,8 @@ use jsonrpsee::{
     ws_client::{WsClient, WsClientBuilder},
 };
 use lib_didethresolver::{
-    did_registry::DIDRegistry, rpc::DidRegistryMethods, types::DidDocument, DidRegistryServer,
-    Resolver,
+    did_registry::DIDRegistry, rpc::DidRegistryMethods, types::string_to_bytes32,
+    types::DidDocument, DidRegistryServer, Resolver,
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::timeout as timeout_tokio;
@@ -109,7 +111,7 @@ where
 
 async fn deploy_to_anvil(anvil: &AnvilInstance) -> Address {
     let wallet: LocalWallet = anvil.keys()[0].clone().into();
-    let client = client(&anvil, wallet).await;
+    let client = client(anvil, wallet).await;
 
     let registry = DIDRegistry::deploy(client.clone(), ())
         .unwrap()
@@ -163,4 +165,33 @@ pub async fn validate_document(document: &DidDocument) {
         log::warn!("{}", info.message);
     }
     assert!(response.valid);
+}
+
+pub async fn set_attribute(
+    registry: &DIDRegistry<Signer>,
+    did: H160,
+    key: &str,
+    value: &str,
+    validity: u64,
+) -> Result<()> {
+    let attribute = registry.set_attribute(
+        did,
+        string_to_bytes32(key),
+        Bytes::from_hex(value)?,
+        U256::from(validity),
+    );
+
+    attribute.send().await?.await?;
+    Ok(())
+}
+
+pub async fn revoke_attribute(
+    registry: &DIDRegistry<Signer>,
+    did: H160,
+    key: &str,
+    value: &str,
+) -> Result<()> {
+    let attribute = registry.revoke_attribute(did, string_to_bytes32(key), Bytes::from_hex(value)?);
+    attribute.send().await?.await?;
+    Ok(())
 }
