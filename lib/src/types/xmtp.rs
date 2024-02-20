@@ -22,8 +22,6 @@ use std::{fmt, time::Duration};
 use crate::resolver::EventContext;
 use serde::{Deserialize, Serialize};
 
-pub const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
-
 /// The XMTP Attribute Type
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct XmtpAttribute {
