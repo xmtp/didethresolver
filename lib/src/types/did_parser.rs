@@ -1,5 +1,4 @@
 //! Parsing Expression Grammer (PEG) parsing rules for parts of a Decentralized Identifier
-
 use ethers::types::Address;
 
 use crate::types::*;
@@ -235,7 +234,10 @@ peg::parser! {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
+
+    use std::ffi::CStr;
 
     #[test]
     fn test_did_attribute_parser() {
@@ -283,6 +285,32 @@ mod tests {
             let parsed = parse_attribute(key);
             assert!(parsed.is_ok(), "Failed to parse key: {}", key);
         }
+    }
+
+    #[test]
+    fn test_parse_hex_c_string_svc() {
+        let decoded_data =
+            hex::decode("6469642f7376632f4d6573736167696e67536572766963650000000000000000")
+                .unwrap();
+        let cstr = CStr::from_bytes_until_nul(decoded_data.as_slice()).unwrap();
+        let parsed = parse_attribute(&cstr.as_ref().to_str().unwrap());
+        assert_eq!(parsed, Ok(Attribute::Service(ServiceType::Messaging)));
+    }
+
+    #[test]
+    fn test_parse_hex_c_string_pub() {
+        let decoded_data =
+            hex::decode("6469642f7075622f456432353531392f766572694b65792f62617365353800").unwrap();
+        let cstr = CStr::from_bytes_until_nul(decoded_data.as_slice()).unwrap();
+        let parsed = parse_attribute(&cstr.as_ref().to_str().unwrap());
+        assert_eq!(
+            parsed,
+            Ok(Attribute::PublicKey(PublicKey {
+                key_type: KeyType::Ed25519VerificationKey2020,
+                purpose: KeyPurpose::VerificationKey,
+                encoding: KeyEncoding::Base58
+            }))
+        );
     }
 
     #[test]

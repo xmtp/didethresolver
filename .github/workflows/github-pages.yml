@@ -37,15 +37,19 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
         run: |
-          cargo test --workspace --all-features --tests tests
+          cargo test -p lib-didethresolver --all-features --tests tests
         id: test
       - name: Invoke cargo doc
         run: |
           rm -rf ./_site
-          cargo doc --workspace --no-deps
+          RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps
           rm -f target/doc/.lock
           cp -r target/doc _site
-          echo "<meta http-equiv=\"refresh\" content=\"0; url=didethresolver\">" > _site/index.html
+          if [ ! -d _site/lib_didethresolver ]; then
+            echo "Error: _site/lib_didethresolver does not exist"
+            exit 1
+          fi
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=lib_didethresolver\">" > _site/index.html
           echo "Taking care of pedantic permissions requirements required by GitHub Pages"
           chmod -R +rX _site
         id: docgen

@@ -15,11 +15,15 @@ COPY --from=ghcr.io/xmtp/foundry:latest /usr/local/bin/anvil /usr/local/bin/anvi
 
 COPY --chown=xmtp:xmtp . .
 
+RUN yamlfmt -lint .github/workflows/*.yml
+
 ENV CARGO_INCREMENTAL=${CARGO_INCREMENTAL:-1}
 RUN cargo check --all-features
 RUN cargo fmt --check --all
 RUN cargo clippy --all-features --no-deps -- -D warnings
 RUN cargo test --workspace --all-features
+ENV RUSTDOCFLAGS="-D warnings"
+RUN cargo doc --all-features --workspace --no-deps
 RUN CARGO_TARGET_DIR=/workspaces/${PROJECT}/target cargo install --path resolver --bin=resolver --root ~${USER}/.cargo/
 RUN valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose ~${USER}/.cargo/bin/resolver --help
 

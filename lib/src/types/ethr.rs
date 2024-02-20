@@ -189,16 +189,19 @@ impl EthrBuilder {
         context: &EventContext,
     ) -> Result<(), EthrBuilderError> {
         let name = event.name_string_lossy();
-        let attribute = types::parse_attribute(&name).unwrap_or(Attribute::Other(name.to_string()));
 
-        log::trace!(
-            "Attribute Event name={}, value={}, now={}, valid_to={}, attr={:?}",
-            name,
-            event.value,
-            self.now,
-            event.valid_to,
-            attribute
-        );
+        if log::log_enabled!(log::Level::Trace) {
+            log::trace!(
+                "Attribute Event name={}, value={}, now={}, valid_to={}",
+                name.clone(),
+                event.value_string_lossy(),
+                self.now,
+                event.valid_to
+            );
+        }
+
+        let attribute =
+            types::parse_attribute(&name).unwrap_or_else(|_err| Attribute::Other(name.to_owned()));
 
         let key = Key::Attribute {
             name: event.name,
@@ -321,6 +324,12 @@ impl EthrBuilder {
         value: V,
         encoding: KeyEncoding,
     ) -> Result<Option<VerificationMethodProperties>, EthrBuilderError> {
+        log::debug!(
+            "decoding attribute value {:?} with encoding: {}",
+            value.as_ref(),
+            encoding
+        );
+
         Ok(match encoding {
             KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
                 public_key_hex: hex::encode(value),
@@ -546,6 +555,46 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn test_attribute_changed_ed25519_from_hex_bytes() {
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let name_from_hex_str =
+            hex::decode("6469642f7075622f456432353531392f766572694b65792f6261736535380000")
+                .unwrap();
+        let name_bytes: [u8; 32] = name_from_hex_str.try_into().unwrap();
+
+        let event = DidattributeChangedFilter {
+            name: name_bytes,
+            value: hex::decode("302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052")
+                .unwrap()
+                .into(),
+            ..base_attr_changed(identity, None)
+        };
+
+        let mut builder = EthrBuilder::default();
+        builder.account_address(&identity).unwrap();
+        builder.now(U256::zero());
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
+
+        let doc = builder.build().unwrap();
+        assert_eq!(
+            doc.verification_method[1],
+            VerificationMethod {
+                id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#delegate-0")
+                    .unwrap(),
+                verification_type: KeyType::Ed25519VerificationKey2020,
+                controller: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f")
+                    .unwrap(),
+                verification_properties: Some(VerificationMethodProperties::PublicKeyBase58 {
+                    public_key_base58:
+                        "GfHq2tTVk9z3mSdEuYacxyV1C1p5arm7aGSJBzhWFKwi5imJXQmyWNbNEjEZ".into()
+                }),
+            }
+        );
+    }
+
+    #[test]
     fn test_attribute_changed_x25519() {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let event = DidattributeChangedFilter {
@@ -582,6 +631,38 @@ pub(crate) mod tests {
         let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
         let event = DidattributeChangedFilter {
             name: *b"did/svc/MessagingService        ",
+            value: b"https://xmtp.com/resolver".into(),
+            ..base_attr_changed(identity, None)
+        };
+
+        let mut builder = EthrBuilder::default();
+        builder.account_address(&identity).unwrap();
+        builder.now(U256::zero());
+        builder
+            .attribute_event(event, &EventContext::mock(0))
+            .unwrap();
+        let doc = builder.build().unwrap();
+        assert_eq!(
+            doc.service,
+            vec![Service {
+                id: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f#service-0")
+                    .unwrap(),
+                service_type: ServiceType::Messaging,
+                service_endpoint: Url::parse("https://xmtp.com/resolver").unwrap(),
+                recipient_keys: "".into(),
+            }]
+        );
+    }
+
+    #[test]
+    fn test_attribute_changed_service_from_hex_bytes() {
+        let name_data =
+            hex::decode("6469642f7376632f4d6573736167696e67536572766963650000000000000000")
+                .unwrap();
+        let name_bytes: [u8; 32] = name_data.try_into().unwrap();
+        let identity = address("0x7e575682a8e450e33eb0493f9972821ae333cd7f");
+        let event = DidattributeChangedFilter {
+            name: name_bytes,
             value: b"https://xmtp.com/resolver".into(),
             ..base_attr_changed(identity, None)
         };

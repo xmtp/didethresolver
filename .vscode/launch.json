@@ -29,7 +29,6 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=resolver",
                     "--package=resolver"
                 ],
                 "filter": {
@@ -38,6 +37,9 @@
                 }
             },
             "args": [],
+            "env": {
+                "RPC_URL": "wss://eth-sepolia.g.alchemy.com/v2/",
+            },
             "cwd": "${workspaceFolder}"
         },
     ]

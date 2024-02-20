@@ -7,19 +7,19 @@
 //! ### Endpoint
 //!
 //! ```text
-//! POST /api/v1/resolveDid
+//! POST
 //! ```
 //!
 //! ### Request Format
 //!
-//! The request should be a JSON object containing one field: `publicKey`.
+//! The request should be a JSON object containing one field: `address`.
 //!
-//! - `publicKey` (string, required): The Ethereum public key (starting with '0x').
+//! - `address` (string, required): The Ethereum address (starting with '0x').
 //!
 //! Example Request:
 //! ```json
 //! {
-//!   "publicKey": "0x123abc..."
+//!   "address": "0x123abc..."
 //! }
 //! ```
 //!
@@ -61,7 +61,7 @@
 //! Example Error Response:
 //! ```json
 //! {
-//!   "error": "Invalid public key format"
+//!   "error": "Invalid address format"
 //! }
 //! ```
 //!
@@ -74,6 +74,11 @@
 //! - All requests must be made over HTTPS.
 //! - Rate limiting is applied to prevent abuse.
 //!
+//! ### Example
+//!
+//! ```bash
+//! curl -H "Content-Type: application/json" -d '{"id":1, "jsonrpc":"2.0", "method":"did_resolveDid", "params": { "publicKey":"x"} }' http://localhost:8080
+//! ```
 //!
 //! ### Support
 //!

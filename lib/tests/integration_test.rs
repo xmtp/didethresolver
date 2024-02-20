@@ -26,7 +26,7 @@ mod it {
         with_client(None, |client, registry, signer, _| async move {
         let me = signer.address();
         set_attribute(&registry, me, "did/pub/Secp256k1/veriKey/hex", "02b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71", 604_800).await?;
-        set_attribute(&registry, me, "did/pub/Ed25519/veriKey/base64", "302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052", 604_800).await?;
+        set_attribute(&registry, me, "did/pub/Ed25519/veriKey/base64", "302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052", 604_800).await?;  
 
         let resolution_response = client.resolve_did(hex::encode(me), None).await?;
         validate_document(&resolution_response.document).await;
