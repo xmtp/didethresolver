@@ -330,7 +330,7 @@ impl EthrBuilder {
             encoding
         );
 
-        let enc = match encoding {
+        Ok(match encoding {
             KeyEncoding::Hex => Some(VerificationMethodProperties::PublicKeyHex {
                 public_key_hex: hex::encode(value),
             }),
@@ -340,9 +340,7 @@ impl EthrBuilder {
             KeyEncoding::Base58 => Some(VerificationMethodProperties::PublicKeyBase58 {
                 public_key_base58: bs58::encode(value).into_string(),
             }),
-        };
-        log::debug!("Encoded {:?}", enc);
-        Ok(enc)
+        })
     }
 
     /// Adds a delegate to the document
@@ -566,7 +564,9 @@ pub(crate) mod tests {
 
         let event = DidattributeChangedFilter {
             name: name_bytes,
-            value: b"b97c30de767f084ce3080168ee293053ba33b235d7116a3263d29f1450936b71".into(),
+            value: hex::decode("302a300506032b656e032100118557777ffb078774371a52b00fed75561dcf975e61c47553e664a617661052")
+                .unwrap()
+                .into(),
             ..base_attr_changed(identity, None)
         };
 
@@ -576,6 +576,7 @@ pub(crate) mod tests {
         builder
             .attribute_event(event, &EventContext::mock(0))
             .unwrap();
+
         let doc = builder.build().unwrap();
         assert_eq!(
             doc.verification_method[1],
@@ -586,7 +587,8 @@ pub(crate) mod tests {
                 controller: DidUrl::parse("did:ethr:0x7e575682a8e450e33eb0493f9972821ae333cd7f")
                     .unwrap(),
                 verification_properties: Some(VerificationMethodProperties::PublicKeyBase58 {
-                    public_key_base58: "2xuEQzL6v6ML38ta35FLU2H1cLKL1cqwzHsJSkkiFZ3ro6be4cs9XScN9n4f7KDTfbZ3DZEuWDYBDhcE924G8Rp4".into()
+                    public_key_base58:
+                        "GfHq2tTVk9z3mSdEuYacxyV1C1p5arm7aGSJBzhWFKwi5imJXQmyWNbNEjEZ".into()
                 }),
             }
         );
