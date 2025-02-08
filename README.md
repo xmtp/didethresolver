@@ -1,3 +1,12 @@
+![Status](https://img.shields.io/badge/Deprecated-brown)
+
+> [!CAUTION]
+> This repo is no longer maintained.
+
+For information about XMTP identities, see [Identity in XMTP](https://xmtp.org/identity).
+
+The documentation below is provided for historical reference only.
+
 # didethresolver
 
 [![Test](https://github.com/xmtp/didethresolver/actions/workflows/ci-image.yml/badge.svg)](https://github.com/xmtp/didethresolver/actions/workflows/ci-image.yml)
